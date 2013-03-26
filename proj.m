@@ -112,7 +112,7 @@ Camera = getappdata(handles.figure1,'camera');
 ct = [0 0 1 0]';
 ct = Camera.Ext\ct;
 Camera.camt = Camera.camt + ct(1:3);
-setappdata(handles.figure1,'camercameraa',Camera);
+setappdata(handles.figure1,'camera',Camera);
 Display(handles);
 
 
@@ -122,7 +122,7 @@ function pushbutton_d_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined i4n a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 Camera = getappdata(handles.figure1,'camera');
-ct = [1 0 0 0]';Push Button
+ct = [1 0 0 0]';
 ct = Camera.Ext\ct;
 Camera.camt = Camera.camt + ct(1:3);
 setappdata(handles.figure1,'camera',Camera);
@@ -185,46 +185,19 @@ Rz = [cos(Camera.thetaz) sin(Camera.thetaz) 0; -sin(Camera.thetaz) cos(Camera.th
 R = Rx*Ry*Rz;
 t = -R*Camera.camt;
 Camera.Ext = [R t; 0 0 0 1]; 
-
-
-CurrentKeyFrame.Ext = Camera.Ext;
-
-
-
-
 Pvanilla = [1 0 0 0; 0 1 0 0; 0 0 1 0];
 Camera.P = Camera.Int*Pvanilla*Camera.Ext;
 setappdata(handles.figure1,'camera',Camera);
-
-
 World = getappdata(handles.figure1,'world');
 
-
-cla(handles.view3d);
-axes(handles.view3d);
-hold on;
-Push Button
-CurrKeyFrame.Camera = Camera;
-kfimpointcount = 0;
-for i = 1:length(World.points)
-    ImagePoint = Project(Camera, World.points(i));
-    if (~isempty(ImagePoint))
-        kfimpointcount = kfimpointcount + 1;
-        CurrKeyFrame.ImagePoints(kfimpointcount) = ImagePoint;
-        plot(ImagePoint.location(1), ImagePoint.location(2),'w');
-    end
-end
-
-%set(handles.view3d,'Color',[0 0 0]);
+CurrKeyFrame = MakeKeyFrame(Camera, World);
+DisplayKeyFrame(CurrKeyFrame,handles.view3d);
 setappdata(handles.figure1,'currkeyframe',CurrKeyFrame);
 
-camera
 
 cla(handles.viewtopdown);
 axes(handles.viewtopdown);
-
-
-hold on;setappdata(handles.figure1,'camera',Camera);
+hold on;
 plot(0, 0,'bx');
 plot(0, 4,'wx');
 plot(Camera.camt(1),Camera.camt(3),'gx');
@@ -234,7 +207,21 @@ plot(Zaxis(1),Zaxis(3),'bx');
 plot(Xaxis(1),Xaxis(3),'rx');
 hold off;
 
-function [ImagePoint] = Project(Camera, WorldPoint)
+
+function [KeyFrame] = MakeKeyFrame(Camera, World)
+kfimpointcount = 0;
+KeyFrame.Camera = Camera;
+KeyFrame.ImagePoints = struct('id',[],'location',[]);
+for i = 1:length(World.points)
+    ImagePoint = ProjectPoint(Camera, World.points(i));
+    if (~isempty(ImagePoint))
+        kfimpointcount = kfimpointcount + 1;
+        KeyFrame.ImagePoints(kfimpointcount) = ImagePoint;
+    end
+end
+
+
+function [ImagePoint] = ProjectPoint(Camera, WorldPoint)
 ImagePoint = [];
 X = WorldPoint.location;
 nX = Camera.Ext*X;
@@ -245,7 +232,7 @@ if (nX(3) > Camera.f)
     if (x(1) > 1 && x(1) < 640 && x(2) > 1 && x(2) < 480)
         ImagePoint.id = WorldPoint.id;
         ImagePoint.location = [x(1) x(2) 1]';
-    endcamera
+    end
 end    
 
 
@@ -254,14 +241,36 @@ function pushbutton_poke_Callback(hObject, eventdata, handles)
 % hObject    handle to pushbutton_poke (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-InitKeyFrame1 = setappdata(handles.figure1,'initkf1');
-InitKeyFrame2 = setappdata(handles.figure1,'initkf2');
+
+InitKeyFrame1 = getappdata(handles.figure1,'initkf1');
+InitKeyFrame2 = getappdata(handles.figure1,'initkf2');
 CurrKeyFrame = getappdata(handles.figure1,'currkeyframe');
 
 if (isempty(InitKeyFrame1))
     InitKeyFrame1 = CurrKeyFrame;
+    DisplayKeyFrame(InitKeyFrame1, handles.viewkeyframe1);
+    setappdata(handles.figure1,'initkf1',InitKeyFrame1);
 else
     if (isempty(InitKeyFrame2))
         InitKeyFrame2 = CurrKeyFrame;
+        DisplayKeyFrame(InitKeyFrame2, handles.viewkeyframe2);
+        setappdata(handles.figure1,'initkf2',InitKeyFrame2);
     end
 end
+
+function DisplayKeyFrame(KeyFrame, AxesHandle)
+cla(AxesHandle);
+axes(AxesHandle);
+hold on;
+for i = 1:length(KeyFrame.ImagePoints)
+    plot(KeyFrame.ImagePoints(i).location(1), KeyFrame.ImagePoints(i).location(2),'w');
+end
+
+%set(AxesHandle,'Color',[0 0 0]);
+%set(AxesHandle,'XLim',[0 640]);
+%set(AxesHandle,'YLim',[0 480]);
+
+
+
+
+
