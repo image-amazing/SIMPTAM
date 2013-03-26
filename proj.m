@@ -255,8 +255,43 @@ else
         InitKeyFrame2 = CurrKeyFrame;
         DisplayKeyFrame(InitKeyFrame2, handles.viewkeyframe2);
         setappdata(handles.figure1,'initkf2',InitKeyFrame2);
+    else
+        Reproject(InitKeyFrame1,InitKeyFrame2);
+    end
+
+    
+    
+end
+
+function Reproject(Keyframe1, Keyframe2)
+
+kf1points = [];
+kf2points = [];
+
+for i = 1:length(Keyframe1.ImagePoints)
+    for j = 1:length(Keyframe2.ImagePoints)
+        if (Keyframe1.ImagePoints(i).id == Keyframe2.ImagePoints(j).id)
+            kf1points = [kf1points Keyframe1.ImagePoints(i).location];
+            kf2points = [kf2points Keyframe2.ImagePoints(j).location];
+        end
     end
 end
+  
+
+f = figure('Position',[100 100 640*2 480]);
+set(gca,'Color',[0 0 0]);
+axis([0 640*2 0 480]);
+hold on;
+plot([640 640],[0 480],'w-');
+plot(kf1points(1,:), kf1points(2,:),'w+');
+plot(640+kf2points(1,:), kf2points(2,:),'w+');
+plot([kf1points(1,:); 640+kf2points(1,:)], [kf1points(2,:); kf2points(2,:)]);
+
+
+
+
+
+
 
 function DisplayKeyFrame(KeyFrame, AxesHandle)
 cla(AxesHandle);
