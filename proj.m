@@ -221,7 +221,6 @@ Zaxis = (Camera.Ext)\[0 0 1 1]';
 Xaxis = (Camera.Ext)\[1 0 0 1]';
 plot(Zaxis(1),Zaxis(3),'bx');
 plot(Xaxis(1),Xaxis(3),'rx');
-    
 hold off;
 
 function [ImagePoint] = Project(Camera, WorldPoint)
