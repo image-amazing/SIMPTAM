@@ -22,7 +22,7 @@ function varargout = proj(varargin)
 
 % Edit the above text to modify the response to help proj
 
-% Last Modified by GUIDE v2.5 25-Mar-2013 15:22:01
+% Last Modified by GUIDE v2.5 26-Mar-2013 14:29:28
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -69,7 +69,14 @@ Camera.thetaz = 0;
 Camera.Ext = [];
 setappdata(handles.figure1,'camera',Camera);
 
+InitKeyFrame1 = [];
+InitKeyFrame2 = [];
+setappdata(handles.figure1,'initkf1',InitKeyFrame1);
+setappdata(handles.figure1,'initkf2',InitKeyFrame2);
+
 Display(handles);
+
+
 
 
 
@@ -105,7 +112,7 @@ Camera = getappdata(handles.figure1,'camera');
 ct = [0 0 1 0]';
 ct = Camera.Ext\ct;
 Camera.camt = Camera.camt + ct(1:3);
-setappdata(handles.figure1,'camera',Camera);
+setappdata(handles.figure1,'camercameraa',Camera);
 Display(handles);
 
 
@@ -115,7 +122,7 @@ function pushbutton_d_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined i4n a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 Camera = getappdata(handles.figure1,'camera');
-ct = [1 0 0 0]';
+ct = [1 0 0 0]';Push Button
 ct = Camera.Ext\ct;
 Camera.camt = Camera.camt + ct(1:3);
 setappdata(handles.figure1,'camera',Camera);
@@ -196,24 +203,28 @@ World = getappdata(handles.figure1,'world');
 cla(handles.view3d);
 axes(handles.view3d);
 hold on;
-
-
-
+Push Button
+CurrKeyFrame.Camera = Camera;
+kfimpointcount = 0;
 for i = 1:length(World.points)
     ImagePoint = Project(Camera, World.points(i));
     if (~isempty(ImagePoint))
-            plot(ImagePoint.location(1), ImagePoint.location(2),'w');
+        kfimpointcount = kfimpointcount + 1;
+        CurrKeyFrame.ImagePoints(kfimpointcount) = ImagePoint;
+        plot(ImagePoint.location(1), ImagePoint.location(2),'w');
     end
 end
 
 %set(handles.view3d,'Color',[0 0 0]);
+setappdata(handles.figure1,'currkeyframe',CurrKeyFrame);
 
+camera
 
 cla(handles.viewtopdown);
 axes(handles.viewtopdown);
 
 
-hold on;
+hold on;setappdata(handles.figure1,'camera',Camera);
 plot(0, 0,'bx');
 plot(0, 4,'wx');
 plot(Camera.camt(1),Camera.camt(3),'gx');
@@ -234,8 +245,23 @@ if (nX(3) > Camera.f)
     if (x(1) > 1 && x(1) < 640 && x(2) > 1 && x(2) < 480)
         ImagePoint.id = WorldPoint.id;
         ImagePoint.location = [x(1) x(2) 1]';
-    end
+    endcamera
 end    
 
 
+% --- Executes on button press in pushbutton_poke.
+function pushbutton_poke_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton_poke (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+InitKeyFrame1 = setappdata(handles.figure1,'initkf1');
+InitKeyFrame2 = setappdata(handles.figure1,'initkf2');
+CurrKeyFrame = getappdata(handles.figure1,'currkeyframe');
 
+if (isempty(InitKeyFrame1))
+    InitKeyFrame1 = CurrKeyFrame;
+else
+    if (isempty(InitKeyFrame2))
+        InitKeyFrame2 = CurrKeyFrame;
+    end
+end
