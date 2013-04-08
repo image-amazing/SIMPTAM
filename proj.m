@@ -52,7 +52,7 @@ function proj_OpeningFcn(hObject, eventdata, handles, varargin)
 % handles    structure with handles and user data (see GUIDATA)
 % varargin   command line arguments to proj (see VARARGIN)
 clc;
-World.points = generateworldpoints();
+World.points = generateworldpoints2();
 setappdata(handles.figure1,'world',World);
 
 Camera.f = 0.5;
@@ -211,7 +211,7 @@ hold off;
 function [KeyFrame] = MakeKeyFrame(Camera, World)
 kfimpointcount = 0;
 KeyFrame.Camera = Camera;
-KeyFrame.ImagePoints = struct('id',[],'location',[]);
+KeyFrame.ImagePoints = struct('id',1,'location',[0 0 1]');
 for i = 1:length(World.points)
     ImagePoint = ProjectPoint(Camera, World.points(i));
     if (~isempty(ImagePoint))
@@ -265,7 +265,7 @@ end
 
 function Reproject(Keyframe1, Keyframe2)
 
-kf1points = [];
+kf1points = []; 
 kf2points = [];
 
 for i = 1:length(Keyframe1.ImagePoints)
@@ -274,8 +274,17 @@ for i = 1:length(Keyframe1.ImagePoints)
             kf1points = [kf1points Keyframe1.ImagePoints(i).location];
             kf2points = [kf2points Keyframe2.ImagePoints(j).location];
         end
+        
     end
 end
+
+X = [];
+for i = 1:size(kf1points,2)
+    X = [X linearreproject(kf1points(:,i),kf2points(:,i),Keyframe1.Camera.P,Keyframe2.Camera.P)];
+end
+display(X);
+
+
   
 
 f = figure('Position',[100 100 640*2 480]);
@@ -286,6 +295,8 @@ plot([640 640],[0 480],'w-');
 plot(kf1points(1,:), kf1points(2,:),'w+');
 plot(640+kf2points(1,:), kf2points(2,:),'w+');
 plot([kf1points(1,:); 640+kf2points(1,:)], [kf1points(2,:); kf2points(2,:)]);
+
+
 
 
 
