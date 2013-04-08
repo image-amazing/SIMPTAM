@@ -22,7 +22,7 @@ function varargout = proj(varargin)
 
 % Edit the above text to modify the response to help proj
 
-% Last Modified by GUIDE v2.5 26-Mar-2013 14:29:28
+% Last Modified by GUIDE v2.5 08-Apr-2013 15:09:08
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -317,6 +317,19 @@ end
 %set(AxesHandle,'YLim',[0 480]);
 
 
-
-
+% --- Executes on button press in pushbutton_path.
+function pushbutton_path_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton_path (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+Camera = getappdata(handles.figure1,'camera');
+for theta = 0:0.1:2*pi
+    clc
+    ct = [9*cos(theta) 0 9*sin(theta) 1]';
+    display(ct);
+    Camera.camt = ct(1:3);
+    Camera.thetay = -theta;
+    setappdata(handles.figure1,'camera',Camera);
+    Display(handles);
+end
 

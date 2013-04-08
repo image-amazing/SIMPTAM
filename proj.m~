@@ -22,7 +22,7 @@ function varargout = proj(varargin)
 
 % Edit the above text to modify the response to help proj
 
-% Last Modified by GUIDE v2.5 26-Mar-2013 14:29:28
+% Last Modified by GUIDE v2.5 08-Apr-2013 15:09:08
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -52,7 +52,7 @@ function proj_OpeningFcn(hObject, eventdata, handles, varargin)
 % handles    structure with handles and user data (see GUIDATA)
 % varargin   command line arguments to proj (see VARARGIN)
 clc;
-World.points = generateworldpoints();
+World.points = generateworldpoints2();
 setappdata(handles.figure1,'world',World);
 
 Camera.f = 0.5;
@@ -211,7 +211,7 @@ hold off;
 function [KeyFrame] = MakeKeyFrame(Camera, World)
 kfimpointcount = 0;
 KeyFrame.Camera = Camera;
-KeyFrame.ImagePoints = struct('id',[],'location',[]);
+KeyFrame.ImagePoints = struct('id',1,'location',[0 0 1]');
 for i = 1:length(World.points)
     ImagePoint = ProjectPoint(Camera, World.points(i));
     if (~isempty(ImagePoint))
@@ -265,24 +265,40 @@ end
 
 function Reproject(Keyframe1, Keyframe2)
 
+kf1points = []; 
+kf2points = [];
+
 for i = 1:length(Keyframe1.ImagePoints)
     for j = 1:length(Keyframe2.ImagePoints)
-        kf1 = true;
+        if (Keyframe1.ImagePoints(i).id == Keyframe2.ImagePoints(j).id)
+            kf1points = [kf1points Keyframe1.ImagePoints(i).location];
+            kf2points = [kf2points Keyframe2.ImagePoints(j).location];
+        end
+        
     end
 end
 
-    if Keyframe2.ImagePoints(j) == i
-        kf2 = true;
-    end
+X = [];
+for i = 1:size(kf1points,2)
+    X = [X linearreproject(kf1points(:,i),kf2points(:,i),Keyframe1.Camera.P,Keyframe2.Camera.P)];
 end
-    
-    if (kf1 == true && kf2 == true)
-        matches =
-    
-    
+display(X);
 
-Keyframe1
-Keyframe2
+
+  
+
+f = figure('Position',[100 100 640*2 480]);
+set(gca,'Color',[0 0 0]);
+axis([0 640*2 0 480]);
+hold on;
+plot([640 640],[0 480],'w-');
+plot(kf1points(1,:), kf1points(2,:),'w+');
+plot(640+kf2points(1,:), kf2points(2,:),'w+');
+plot([kf1points(1,:); 640+kf2points(1,:)], [kf1points(2,:); kf2points(2,:)]);
+
+
+
+
 
 
 
@@ -301,6 +317,21 @@ end
 %set(AxesHandle,'YLim',[0 480]);
 
 
-
-
+% --- Executes on button press in pushbutton_path.
+function pushbutton_path_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton_path (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+Camera = getappdata(handles.figure1,'camera');
+for theta = 0:0.1:2*pi
+    clc
+    ct = [7*cos(theta) 0 7*sin(theta) 1]';
+    display(ct);
+    display(
+    ct = Camera.Ext\ct;
+    Camera.camt = ct(1:3);
+    Camera.thetay = 0;
+    setappdata(handles.figure1,'camera',Camera);
+    Display(handles);
+end
 
