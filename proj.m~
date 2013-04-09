@@ -22,7 +22,7 @@ function varargout = proj(varargin)
 
 % Edit the above text to modify the response to help proj
 
-% Last Modified by GUIDE v2.5 08-Apr-2013 15:09:08
+% Last Modified by GUIDE v2.5 09-Apr-2013 11:33:35
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -74,7 +74,12 @@ InitKeyFrame2 = [];
 setappdata(handles.figure1,'initkf1',InitKeyFrame1);
 setappdata(handles.figure1,'initkf2',InitKeyFrame2);
 
-Display(handles);
+
+Display(handles,World,handles.view3d);
+EstWorld.points(1).location = [0 0 0 1]';
+EstWorld.points(1).id = -1;
+setappdata(handles.figure1,'estworld',EstWorld);
+
 
 
 
@@ -113,7 +118,7 @@ ct = [0 0 1 0]';
 ct = Camera.Ext\ct;
 Camera.camt = Camera.camt + ct(1:3);
 setappdata(handles.figure1,'camera',Camera);
-Display(handles);
+UpdateTick(handles);
 
 
 % --- Executes on button press in pushbutton_d.
@@ -126,7 +131,7 @@ ct = [1 0 0 0]';
 ct = Camera.Ext\ct;
 Camera.camt = Camera.camt + ct(1:3);
 setappdata(handles.figure1,'camera',Camera);
-Display(handles);
+UpdateTick(handles);
 
 % --- Executes on button press in pushbutton_s.
 function pushbutton_s_Callback(hObject, eventdata, handles)
@@ -138,7 +143,7 @@ ct = [0 0 -1 0]';
 ct = Camera.Ext\ct;
 Camera.camt = Camera.camt + ct(1:3);
 setappdata(handles.figure1,'camera',Camera);
-Display(handles);
+UpdateTick(handles);
 
 % --- Executes on button press in pushbutton_a.
 function pushbutton_a_Callback(hObject, eventdata, handles)
@@ -150,8 +155,8 @@ ct = [-1 0 0 0]';
 ct = Camera.Ext\ct;
 Camera.camt = Camera.camt + ct(1:3);
 setappdata(handles.figure1,'camera',Camera);
-Display(handles);
-    
+UpdateTick(handles);
+
 % --- Executes on button press in pushbutton_right.
 function pushbutton_right_Callback(hObject, eventdata, handles)
 % hObject    handle to pushbutton_right (see GCBO)
@@ -161,7 +166,8 @@ Camera = getappdata(handles.figure1,'camera');
 Camera.thetay = Camera.thetay + 0.1;
 guidata(handles.figure1,handles);
 setappdata(handles.figure1,'camera',Camera);
-Display(handles);
+UpdateTick(handles);
+
 
 
 % --- Executes on button press in pucamerashbutton_left.
@@ -172,40 +178,43 @@ function pushbutton_left_Callback(hObject, eventdata, handles)
 Camera = getappdata(handles.figure1,'camera');
 Camera.thetay = Camera.thetay - 0.1;
 setappdata(handles.figure1,'camera',Camera);
-Display(handles);
+UpdateTick(handles);
 
-
-function Display(handles)
-Camera = getappdata(handles.figure1,'camera');
-
-
+function outputCamera = UpdateCamera(Camera)
+outputCamera = Camera;
 Rx = [1 0 0; 0 cos(Camera.thetax) sin(Camera.thetax); 0 -sin(Camera.thetax) cos(Camera.thetax)];
 Ry = [cos(Camera.thetay) 0 -sin(Camera.thetay); 0 1 0; sin(Camera.thetay) 0 cos(Camera.thetay)];
 Rz = [cos(Camera.thetaz) sin(Camera.thetaz) 0; -sin(Camera.thetaz) cos(Camera.thetaz) 0; 0 0 1];
-R = Rx*Ry*Rz;
-t = -R*Camera.camt;
-Camera.Ext = [R t; 0 0 0 1]; 
+outputCamera.R = Rx*Ry*Rz;
+outputCamera.t = -outputCamera.R*Camera.camt;
+outputCamera.Ext = [outputCamera.R outputCamera.t; 0 0 0 1]; 
 Pvanilla = [1 0 0 0; 0 1 0 0; 0 0 1 0];
-Camera.P = Camera.Int*Pvanilla*Camera.Ext;
-setappdata(handles.figure1,'camera',Camera);
-World = getappdata(handles.figure1,'world');
+outputCamera.P = outputCamera.Int*Pvanilla*outputCamera.Ext;
+
+
+function Display(handles, World, viewhandle)
+
 
 CurrKeyFrame = MakeKeyFrame(Camera, World);
-DisplayKeyFrame(CurrKeyFrame,handles.view3d);
+DisplayKeyFrame(CurrKeyFrame,viewhandle);
 setappdata(handles.figure1,'currkeyframe',CurrKeyFrame);
+DisplayTopDown(Camera,handles.viewtopdown);
 
 
-cla(handles.viewtopdown);
-axes(handles.viewtopdown);
+
+
+function DisplayTopDown(Camera, viewhandle)
+cla(viewhandle);
+axes(viewhandle);
 hold on;
 plot(0, 0,'bx');
-plot(0, 4,'wx');
 plot(Camera.camt(1),Camera.camt(3),'gx');
 Zaxis = (Camera.Ext)\[0 0 1 1]';
 Xaxis = (Camera.Ext)\[1 0 0 1]';
 plot(Zaxis(1),Zaxis(3),'bx');
 plot(Xaxis(1),Xaxis(3),'rx');
 hold off;
+
 
 
 function [KeyFrame] = MakeKeyFrame(Camera, World)
@@ -245,6 +254,7 @@ function pushbutton_poke_Callback(hObject, eventdata, handles)
 InitKeyFrame1 = getappdata(handles.figure1,'initkf1');
 InitKeyFrame2 = getappdata(handles.figure1,'initkf2');
 CurrKeyFrame = getappdata(handles.figure1,'currkeyframe');
+World = getappdata(handles.figure1,'world');
 
 if (isempty(InitKeyFrame1))
     InitKeyFrame1 = CurrKeyFrame;
@@ -256,52 +266,56 @@ else
         DisplayKeyFrame(InitKeyFrame2, handles.viewkeyframe2);
         setappdata(handles.figure1,'initkf2',InitKeyFrame2);
     else
-        Reproject(InitKeyFrame1,InitKeyFrame2);
+        points = Reproject(InitKeyFrame1,InitKeyFrame2);
+        EstWorld.points = points;
+        error = calculateworlderror(World,EstWorld);
+        display(error);
     end
 
     
     
 end
 
-function Reproject(Keyframe1, Keyframe2)
+function outpoints = Reproject(Keyframe1, Keyframe2)
 
 kf1points = []; 
 kf2points = [];
+ids = [];
 
 for i = 1:length(Keyframe1.ImagePoints)
     for j = 1:length(Keyframe2.ImagePoints)
         if (Keyframe1.ImagePoints(i).id == Keyframe2.ImagePoints(j).id)
             kf1points = [kf1points Keyframe1.ImagePoints(i).location];
             kf2points = [kf2points Keyframe2.ImagePoints(j).location];
+            ids = [ids Keyframe1.ImagePoints(i).id];
+            
         end
         
     end
 end
 
 X = [];
+
 for i = 1:size(kf1points,2)
-    X = [X linearreproject(kf1points(:,i),kf2points(:,i),Keyframe1.Camera.P,Keyframe2.Camera.P)];
+    newpoint = linearreproject(kf1points(:,i),kf2points(:,i),Keyframe1.Camera.P,Keyframe2.Camera.P);
+    X = [X newpoint];
+    outpoints(i).location = newpoint;
+    outpoints(i).id = ids(i);
 end
-display(X);
-
-
-  
-
-f = figure('Position',[100 100 640*2 480]);
-set(gca,'Color',[0 0 0]);
-axis([0 640*2 0 480]);
-hold on;
-plot([640 640],[0 480],'w-');
-plot(kf1points(1,:), kf1points(2,:),'w+');
-plot(640+kf2points(1,:), kf2points(2,:),'w+');
-plot([kf1points(1,:); 640+kf2points(1,:)], [kf1points(2,:); kf2points(2,:)]);
-
-
-
-
-
-
-
+% display(X);
+% display(ids);
+% 
+% 
+%   
+% 
+% f = figure('Position',[100 100 640*2 480]);
+% set(gca,'Color',[0 0 0]);
+% axis([0 640*2 0 480]);
+% hold on;
+% plot([640 640],[0 480],'w-');
+% plot(kf1points(1,:), kf1points(2,:),'w+');
+% plot(640+kf2points(1,:), kf2points(2,:),'w+');
+% plot([kf1points(1,:); 640+kf2points(1,:)], [kf1points(2,:); kf2points(2,:)]);
 
 
 function DisplayKeyFrame(KeyFrame, AxesHandle)
@@ -325,13 +339,88 @@ function pushbutton_path_Callback(hObject, eventdata, handles)
 Camera = getappdata(handles.figure1,'camera');
 for theta = 0:0.1:2*pi
     clc
-    ct = [7*cos(theta) 0 7*sin(theta) 1]';
+    ct = [18*cos(theta)-16 0 18*sin(theta)]';
     display(ct);
-    display(
-    ct = Camera.Ext\ct;
-    Camera.camt = ct(1:3);
-    Camera.thetay = 0;
+    Camera.camt = ct;
+    Camera.thetay = -theta;
     setappdata(handles.figure1,'camera',Camera);
-    Display(handles);
+    World = getappdata(handles.figure1,'world');
+    EstWorld = getappdata(handles.figure1,'estworld');
+    Display(handles,World,handles.view3d);
+    Display(handles,EstWorld,handles.view3dest);
 end
 
+
+% --- Executes on button press in pushbutton_init1.
+function pushbutton_init1_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton_init1 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+Camera = getappdata(handles.figure1,'camera');
+ct = [0 0 0]';
+Camera.camt = ct;
+setappdata(handles.figure1,'camera',Camera);
+World = getappdata(handles.figure1,'world');
+Display(handles,World,handles.view3d);
+CurrKeyFrame = getappdata(handles.figure1,'currkeyframe');
+InitKeyFrame1 = CurrKeyFrame;
+DisplayKeyFrame(InitKeyFrame1, handles.viewkeyframe1);
+setappdata(handles.figure1,'initkf1',InitKeyFrame1);
+setappdata(handles.figure1,'camera',Camera);
+
+
+
+% --- Executes on button press in pushbutton_init2.
+function pushbutton_init2_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton_init2 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+Camera = getappdata(handles.figure1,'camera');
+ct = [2 0 0]';
+Camera.camt = ct;
+setappdata(handles.figure1,'camera',Camera);
+World = getappdata(handles.figure1,'world');
+Display(handles,World,handles.view3d);
+CurrKeyFrame = getappdata(handles.figure1,'currkeyframe');
+InitKeyFrame2 = CurrKeyFrame;
+DisplayKeyFrame(InitKeyFrame2, handles.viewkeyframe2);
+setappdata(handles.figure1,'initkf2',InitKeyFrame2);
+setappdata(handles.figure1,'camera',Camera);
+
+
+% --- Executes on button press in pushbutton_reproject.
+function pushbutton_reproject_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton_reproject (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+InitKeyFrame1 = getappdata(handles.figure1,'initkf1');
+InitKeyFrame2 = getappdata(handles.figure1,'initkf2');
+World = getappdata(handles.figure1,'world');
+
+newpoints = Reproject(InitKeyFrame1, InitKeyFrame2);
+EstWorld.points = newpoints;
+setappdata(handles.figure1,'estworld',EstWorld);
+UpdateTick(handles);
+error = calculateworlderror(World,EstWorld);
+display(error);
+
+set(handles.text_worlderror,'String','Duncan');
+
+function UpdateTick(handles)
+World = getappdata(handles.figure1,'world');
+EstWorld = getappdata(handles.figure1,'estworld');
+Camera = getappdata(handles.figure1,'camera');
+Camera = UpdateCamera(Camera);
+setappdata(handles.figure1,'camera',Camera);
+
+
+Display(handles,World,handles.view3d);
+Display(handles,EstWorld,handles.view3dest);
+
+
+
+
+
+
+
+    
