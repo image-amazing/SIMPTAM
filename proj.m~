@@ -75,10 +75,11 @@ setappdata(handles.figure1,'initkf1',InitKeyFrame1);
 setappdata(handles.figure1,'initkf2',InitKeyFrame2);
 
 
-Display(handles,World,handles.view3d);
 EstWorld.points(1).location = [0 0 0 1]';
 EstWorld.points(1).id = -1;
 setappdata(handles.figure1,'estworld',EstWorld);
+
+UpdateTick(handles)
 
 
 
@@ -191,18 +192,6 @@ outputCamera.Ext = [outputCamera.R outputCamera.t; 0 0 0 1];
 Pvanilla = [1 0 0 0; 0 1 0 0; 0 0 1 0];
 outputCamera.P = outputCamera.Int*Pvanilla*outputCamera.Ext;
 
-
-function Display(handles, World, viewhandle)
-
-
-CurrKeyFrame = MakeKeyFrame(Camera, World);
-DisplayKeyFrame(CurrKeyFrame,viewhandle);
-setappdata(handles.figure1,'currkeyframe',CurrKeyFrame);
-DisplayTopDown(Camera,handles.viewtopdown);
-
-
-
-
 function DisplayTopDown(Camera, viewhandle)
 cla(viewhandle);
 axes(viewhandle);
@@ -276,6 +265,46 @@ else
     
 end
 
+function CalculateF(Keyframe1, Keyframe2,K, F1)
+
+kf1points = []; 
+kf2points = [];
+ids = [];
+
+for i = 1:length(Keyframe1.ImagePoints)
+    for j = 1:length(Keyframe2.ImagePoints)
+        if (Keyframe1.ImagePoints(i).id == Keyframe2.ImagePoints(j).id)
+            kf1points = [kf1points Keyframe1.ImagePoints(i).location];
+            kf2points = [kf2points Keyframe2.ImagePoints(j).location];
+            ids = [ids Keyframe1.ImagePoints(i).id];
+            
+        end
+        
+    end
+end
+
+
+F = fundmatrix(kf1points,kf2points);
+E = K'*F*K;
+t = null(E');
+
+
+[U, S, V] = svd(E);
+W = [0 -1 0; 1 0 0; 0 0 1];
+R1 = U*W*V';
+R2 = U*W'*V';
+
+display(R1);
+display(R2);
+display(t);
+
+
+
+
+
+
+
+
 function outpoints = Reproject(Keyframe1, Keyframe2)
 
 kf1points = []; 
@@ -344,10 +373,7 @@ for theta = 0:0.1:2*pi
     Camera.camt = ct;
     Camera.thetay = -theta;
     setappdata(handles.figure1,'camera',Camera);
-    World = getappdata(handles.figure1,'world');
-    EstWorld = getappdata(handles.figure1,'estworld');
-    Display(handles,World,handles.view3d);
-    Display(handles,EstWorld,handles.view3dest);
+    UpdateTick(handles);
 end
 
 
@@ -360,8 +386,8 @@ Camera = getappdata(handles.figure1,'camera');
 ct = [0 0 0]';
 Camera.camt = ct;
 setappdata(handles.figure1,'camera',Camera);
-World = getappdata(handles.figure1,'world');
-Display(handles,World,handles.view3d);
+UpdateTick(handles);
+
 CurrKeyFrame = getappdata(handles.figure1,'currkeyframe');
 InitKeyFrame1 = CurrKeyFrame;
 DisplayKeyFrame(InitKeyFrame1, handles.viewkeyframe1);
@@ -379,8 +405,8 @@ Camera = getappdata(handles.figure1,'camera');
 ct = [2 0 0]';
 Camera.camt = ct;
 setappdata(handles.figure1,'camera',Camera);
-World = getappdata(handles.figure1,'world');
-Display(handles,World,handles.view3d);
+UpdateTick(handles);
+
 CurrKeyFrame = getappdata(handles.figure1,'currkeyframe');
 InitKeyFrame2 = CurrKeyFrame;
 DisplayKeyFrame(InitKeyFrame2, handles.viewkeyframe2);
@@ -396,15 +422,28 @@ function pushbutton_reproject_Callback(hObject, eventdata, handles)
 InitKeyFrame1 = getappdata(handles.figure1,'initkf1');
 InitKeyFrame2 = getappdata(handles.figure1,'initkf2');
 World = getappdata(handles.figure1,'world');
+Camera = getappdata(handles.figure1,'camera');
+K = Camera.Int;
+Kinv = inv(K);
+tx = [0 0 2; 0 0 0; -2 0 0];
+R = eye(3,3);
+F1 = Kinv'*tx*R*Kinv;
+display(F1);
 
+
+
+
+
+
+s
+
+CalculateF(InitKeyFrame1, InitKeyFrame2, Camera.Int,F1);
 newpoints = Reproject(InitKeyFrame1, InitKeyFrame2);
 EstWorld.points = newpoints;
 setappdata(handles.figure1,'estworld',EstWorld);
 UpdateTick(handles);
 error = calculateworlderror(World,EstWorld);
-display(error);
-
-set(handles.text_worlderror,'String','Duncan');
+set(handles.text_worlderror,'String',['World Error: ' num2str(error)]);
 
 function UpdateTick(handles)
 World = getappdata(handles.figure1,'world');
@@ -412,10 +451,17 @@ EstWorld = getappdata(handles.figure1,'estworld');
 Camera = getappdata(handles.figure1,'camera');
 Camera = UpdateCamera(Camera);
 setappdata(handles.figure1,'camera',Camera);
+EstCamera = Camera;
 
+CurrKeyFrame = MakeKeyFrame(Camera, World);
+DisplayKeyFrame(CurrKeyFrame, handles.view3d);
+setappdata(handles.figure1,'currkeyframe',CurrKeyFrame);
+DisplayTopDown(Camera,handles.viewtopdown);
 
-Display(handles,World,handles.view3d);
-Display(handles,EstWorld,handles.view3dest);
+EstCurrKeyFrame = MakeKeyFrame(EstCamera, EstWorld);
+DisplayKeyFrame(EstCurrKeyFrame, handles.view3dest);
+setappdata(handles.figure1,'estcurrkeyframe',EstCurrKeyFrame);
+DisplayTopDown(EstCamera,handles.viewtopdownest);
 
 
 
