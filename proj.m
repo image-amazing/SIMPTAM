@@ -22,7 +22,7 @@ function varargout = proj(varargin)
 
 % Edit the above text to modify the response to help proj
 
-% Last Modified by GUIDE v2.5 11-Apr-2013 15:45:13
+% Last Modified by GUIDE v2.5 12-Apr-2013 12:00:33
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -217,7 +217,7 @@ hold off;
 function [KeyFrame] = MakeKeyFrame(Camera, World)
 kfimpointcount = 0;
 KeyFrame.Camera = Camera;
-KeyFrame.ImagePoints = struct('id',1,'location',[0 0 1]');
+KeyFrame.ImagePoints = struct('id',1,'location',[0 0 1]','X',[0 0 0 1]');
 for i = 1:length(World.points)
     ImagePoint = ProjectPoint(Camera, World.points(i));
     if (~isempty(ImagePoint))
@@ -572,10 +572,3 @@ Camera = getappdata(handles.figure1,'camera');
 EstCamera = getappdata(handles.figure1,'estcamera');
 
 CurrKeyFrame = MakeKeyFrame(Camera, World);
-
-
-
-
-
-
-
