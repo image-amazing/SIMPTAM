@@ -22,7 +22,7 @@ function varargout = proj(varargin)
 
 % Edit the above text to modify the response to help proj
 
-% Last Modified by GUIDE v2.5 09-Apr-2013 11:33:35
+% Last Modified by GUIDE v2.5 11-Apr-2013 15:45:13
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -66,8 +66,12 @@ Camera.camt = [0 0 0]';
 Camera.thetax = 0;
 Camera.thetay = 0;    
 Camera.thetaz = 0;
-Camera.Ext = [];
+Camera.R = eye(3,3);
+Camera.t = zeros(3,1);
+Camera.Ext = [Camera.R Camera.t; 0 0 0 1];
 setappdata(handles.figure1,'camera',Camera);
+EstCamera = Camera;
+setappdata(handles.figure1,'estcamera',EstCamera);
 
 InitKeyFrame1 = [];
 InitKeyFrame2 = [];
@@ -181,26 +185,30 @@ Camera.thetay = Camera.thetay - 0.1;
 setappdata(handles.figure1,'camera',Camera);
 UpdateTick(handles);
 
-function outputCamera = UpdateCamera(Camera)
+function outputCamera = RfromEuler(Camera)
 outputCamera = Camera;
 Rx = [1 0 0; 0 cos(Camera.thetax) sin(Camera.thetax); 0 -sin(Camera.thetax) cos(Camera.thetax)];
 Ry = [cos(Camera.thetay) 0 -sin(Camera.thetay); 0 1 0; sin(Camera.thetay) 0 cos(Camera.thetay)];
 Rz = [cos(Camera.thetaz) sin(Camera.thetaz) 0; -sin(Camera.thetaz) cos(Camera.thetaz) 0; 0 0 1];
 outputCamera.R = Rx*Ry*Rz;
 outputCamera.t = -outputCamera.R*Camera.camt;
+
+
+function outputCamera = SetP(Camera)
+outputCamera = Camera;
 outputCamera.Ext = [outputCamera.R outputCamera.t; 0 0 0 1]; 
-Pvanilla = [1 0 0 0; 0 1 0 0; 0 0 1 0];
-outputCamera.P = outputCamera.Int*Pvanilla*outputCamera.Ext;
+outputCamera.P = outputCamera.Int*[outputCamera.R outputCamera.t];
 
 function DisplayTopDown(Camera, viewhandle)
 cla(viewhandle);
 axes(viewhandle);
 hold on;
 plot(0, 0,'bx');
-plot(Camera.camt(1),Camera.camt(3),'gx');
+Yaxis = (Camera.Ext)\[0 1 0 1]';
 Zaxis = (Camera.Ext)\[0 0 1 1]';
 Xaxis = (Camera.Ext)\[1 0 0 1]';
 plot(Zaxis(1),Zaxis(3),'bx');
+plot(Yaxis(1),Yaxis(3),'gx');
 plot(Xaxis(1),Xaxis(3),'rx');
 hold off;
 
@@ -230,6 +238,7 @@ if (nX(3) > Camera.f)
     if (x(1) > 1 && x(1) < 640 && x(2) > 1 && x(2) < 480)
         ImagePoint.id = WorldPoint.id;
         ImagePoint.location = [x(1) x(2) 1]';
+        ImagePoint.X = X;
     end
 end    
 
@@ -265,7 +274,128 @@ else
     
 end
 
-function outpoints = Reproject(Keyframe1, Keyframe2)
+function Ext = CalculateExt(Keyframe1, Keyframe2,K, F1)
+
+kf1points = []; 
+kf2points = [];
+ids = [];
+ids2 = [];
+
+for i = 1:length(Keyframe1.ImagePoints)
+    for j = 1:length(Keyframe2.ImagePoints)
+        if (Keyframe1.ImagePoints(i).id == Keyframe2.ImagePoints(j).id)
+            kf1points = [kf1points Keyframe1.ImagePoints(i).location];
+            kf2points = [kf2points Keyframe2.ImagePoints(j).location];
+            ids = [ids Keyframe1.ImagePoints(i).id];
+            ids2 = [ids2 Keyframe2.ImagePoints(j).id];
+            
+        end
+        
+    end
+end
+
+
+F = fundmatrix(kf1points,kf2points);
+display(F);
+E = K'*F*K;
+t = null(E');
+display(t);
+t1 = t;
+t2 = -t;
+
+
+
+[U, S, V] = svd(E);
+
+W = [0 -1 0; 1 0 0; 0 0 1];
+
+R1 = U*W*V';
+R2 = U*W'*V';
+
+% display(R1);
+% display(R2);
+
+P = K*[eye(3,3) zeros(3,1)];
+P1 = K*[R1 t1];
+P2 = K*[R1 t2];
+P3 = K*[R2 t1];
+P4 = K*[R2 t2];
+
+
+
+
+error1 = 0;
+error2 = 0;
+error3 = 0;
+error4 = 0;
+
+for i = 1:size(kf1points,2)
+    X1 = linearreproject(kf1points(:,i),kf2points(:,i),P,P1);
+    X2 = linearreproject(kf1points(:,i),kf2points(:,i),P,P2);
+    X3 = linearreproject(kf1points(:,i),kf2points(:,i),P,P3);
+    X4 = linearreproject(kf1points(:,i),kf2points(:,i),P,P4);
+    error1 = error1 + (X1(3)<0);
+    error2 = error2 + (X2(3)<0);
+    error3 = error3 + (X3(3)<0);
+    error4 = error4 + (X4(3)<0);
+end
+
+display(error1);
+display(error2);
+display(error3);
+display(error4);
+
+if error1 == 0
+    R = R1;
+    t = t1;
+end
+
+if error2 == 0
+    R = R1;
+    t = t2;
+end
+
+if error3 == 0
+    R = R2;
+    t = t1;
+end
+
+if error4 == 0
+    R = R2;
+    t = t2;
+end
+
+scale = abs(2/t(1));
+t = t*scale;
+
+
+
+display(R);
+display(t);
+
+Ext = [R t; 0 0 0 1];
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function outpoints = Reproject(Keyframe1, Keyframe2, P1, P2)
 
 kf1points = []; 
 kf2points = [];
@@ -286,11 +416,13 @@ end
 X = [];
 
 for i = 1:size(kf1points,2)
-    newpoint = linearreproject(kf1points(:,i),kf2points(:,i),Keyframe1.Camera.P,Keyframe2.Camera.P);
+    newpoint = linearreproject(kf1points(:,i),kf2points(:,i),P1,P2);
     X = [X newpoint];
     outpoints(i).location = newpoint;
     outpoints(i).id = ids(i);
 end
+
+
 % display(X);
 % display(ids);
 % 
@@ -314,11 +446,6 @@ hold on;
 for i = 1:length(KeyFrame.ImagePoints)
     plot(KeyFrame.ImagePoints(i).location(1), KeyFrame.ImagePoints(i).location(2),'w');
 end
-
-%set(AxesHandle,'Color',[0 0 0]);
-%set(AxesHandle,'XLim',[0 640]);
-%set(AxesHandle,'YLim',[0 480]);
-
 
 % --- Executes on button press in pushbutton_path.
 function pushbutton_path_Callback(hObject, eventdata, handles)
@@ -371,7 +498,7 @@ CurrKeyFrame = getappdata(handles.figure1,'currkeyframe');
 InitKeyFrame2 = CurrKeyFrame;
 DisplayKeyFrame(InitKeyFrame2, handles.viewkeyframe2);
 setappdata(handles.figure1,'initkf2',InitKeyFrame2);
-setappdata(handles.figure1,'camera',Camera);
+
 
 
 % --- Executes on button press in pushbutton_reproject.
@@ -382,10 +509,23 @@ function pushbutton_reproject_Callback(hObject, eventdata, handles)
 InitKeyFrame1 = getappdata(handles.figure1,'initkf1');
 InitKeyFrame2 = getappdata(handles.figure1,'initkf2');
 World = getappdata(handles.figure1,'world');
+Camera = getappdata(handles.figure1,'camera');
+EstCamera = getappdata(handles.figure1,'estcamera');
+K = Camera.Int;
+Kinv = inv(K);
+tx = [0 0 2; 0 0 0; -2 0 0];
+R = eye(3,3);
+F1 = Kinv'*tx*R*Kinv;
+display(F1);
+EstCamera.Ext = CalculateExt(InitKeyFrame1, InitKeyFrame2, Camera.Int,F1);
+EstCamera.P = K*EstCamera.Ext(1:3,:);
+P1 = K*[eye(3,3) [0;0;0]];
 
-newpoints = Reproject(InitKeyFrame1, InitKeyFrame2);
+
+newpoints = Reproject(InitKeyFrame1, InitKeyFrame2,P1,EstCamera.P);
 EstWorld.points = newpoints;
 setappdata(handles.figure1,'estworld',EstWorld);
+setappdata(handles.figure1,'estcamera',EstCamera);
 UpdateTick(handles);
 error = calculateworlderror(World,EstWorld);
 set(handles.text_worlderror,'String',['World Error: ' num2str(error)]);
@@ -394,9 +534,21 @@ function UpdateTick(handles)
 World = getappdata(handles.figure1,'world');
 EstWorld = getappdata(handles.figure1,'estworld');
 Camera = getappdata(handles.figure1,'camera');
-Camera = UpdateCamera(Camera);
+EstCamera = getappdata(handles.figure1,'estcamera');
+Camera = RfromEuler(Camera);
+Camera = SetP(Camera);
+
+Ext = Camera.Ext;
+Ext = round(Ext*1000)/1000;
+set(handles.text_camext,'String',['Camera Ext: ' mat2str(Ext)]);
+
+Ext = EstCamera.Ext;
+Ext = round(Ext*1000)/1000;
+set(handles.text_estcamext,'String',['EstCamera Ext: ' mat2str(Ext)]);
+
 setappdata(handles.figure1,'camera',Camera);
-EstCamera = Camera;
+setappdata(handles.figure1,'estcamera',EstCamera);
+
 
 CurrKeyFrame = MakeKeyFrame(Camera, World);
 DisplayKeyFrame(CurrKeyFrame, handles.view3d);
@@ -408,10 +560,22 @@ DisplayKeyFrame(EstCurrKeyFrame, handles.view3dest);
 setappdata(handles.figure1,'estcurrkeyframe',EstCurrKeyFrame);
 DisplayTopDown(EstCamera,handles.viewtopdownest);
 
+% --- Executes on button press in pushbutton_estcam.
+function pushbutton_estcam_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton_estcam (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+World = getappdata(handles.figure1,'world');
+EstWorld = getappdata(handles.figure1,'estworld');
+Camera = getappdata(handles.figure1,'camera');
+EstCamera = getappdata(handles.figure1,'estcamera');
+
+CurrKeyFrame = MakeKeyFrame(Camera, World);
 
 
 
 
 
 
-    
+

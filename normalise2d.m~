@@ -1,0 +1,17 @@
+function [T] = normalise2d(matches)
+
+centroid = mean(matches,2);
+
+
+d = matches(1,:).^2 + matches(2,:).^2;
+d = mean(sqrt(d));
+s = sqrt(2)/d;
+c = centroid;
+c(1:2) = -c(1:2)*s;
+T = [s 0; 0 s; 0 0];
+T = [T c];
+nmatches = T*matches;
+
+end
+
+
