@@ -642,7 +642,7 @@ error = 10;
 
 
 [X x] = FindMatches(EstWorld, CurrKeyFrame,npoints);
-[muout error] = estcam3(Ein,K,X,x,300);
+[muout error] = estimatepose(Ein,K,X,x,300);
 
 
 
