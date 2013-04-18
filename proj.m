@@ -22,7 +22,7 @@ function varargout = proj(varargin)
 
 % Edit the above text to modify the response to help proj
 
-% Last Modified by GUIDE v2.5 18-Apr-2013 12:07:13
+% Last Modified by GUIDE v2.5 18-Apr-2013 14:38:03
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -56,11 +56,11 @@ World.points = generateworldpoints2();
 setappdata(handles.figure1,'world',World);
 
 Camera.f = 0.5;
-Camera.ay = 480*Camera.f;
-Camera.ax = 640*Camera.f;
-Camera.u0 = 640/2;
-Camera.v0 = 480/2;
-Camera.Int = [Camera.ax 0 Camera.u0; 0 Camera.ay Camera.v0; 0 0 1];
+ay = 480*Camera.f;
+ax = 640*Camera.f;
+u0 = 640/2;
+v0 = 480/2;
+Camera.K = [ax 0 u0; 0 ay v0; 0 0 1];
 
 Camera.camt = [0 0 0]';
 Camera.thetax = 0;
@@ -68,9 +68,8 @@ Camera.thetay = 0;
 Camera.thetaz = 0;
 Camera.R = eye(3,3);
 Camera.t = zeros(3,1);
-Camera.Ext = [Camera.R Camera.t; 0 0 0 1];
-Camera.mu = [0 0 0 0 0 0];
-Camera.P = Camera.Int*Camera.Ext(1:3,:);
+Camera.E = [Camera.R Camera.t; 0 0 0 1];
+Camera.P = Camera.K*Camera.E(1:3,:);
 setappdata(handles.figure1,'camera',Camera);
 EstCamera = Camera;
 setappdata(handles.figure1,'estcamera',EstCamera);
@@ -83,7 +82,7 @@ setappdata(handles.figure1,'initkf2',InitKeyFrame2);
 
 EstWorld.points(1).location = [0 0 0 1]';
 EstWorld.points(1).id = -1;
-EstWorld.points = World.points;
+% EstWorld.points = World.points;
 setappdata(handles.figure1,'estworld',EstWorld);
 
 UpdateTick(handles)
@@ -123,7 +122,7 @@ function pushbutton_w_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 Camera = getappdata(handles.figure1,'camera');
 ct = [0 0 1 0]';
-ct = Camera.Ext\ct;
+ct = Camera.E\ct;
 Camera.camt = Camera.camt + ct(1:3);
 setappdata(handles.figure1,'camera',Camera);
 UpdateTick(handles);
@@ -136,7 +135,7 @@ function pushbutton_d_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 Camera = getappdata(handles.figure1,'camera');
 ct = [1 0 0 0]';
-ct = Camera.Ext\ct;
+ct = Camera.E\ct;
 Camera.camt = Camera.camt + ct(1:3);
 setappdata(handles.figure1,'camera',Camera);
 UpdateTick(handles);
@@ -148,7 +147,7 @@ function pushbutton_s_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 Camera = getappdata(handles.figure1,'camera');
 ct = [0 0 -1 0]';
-ct = Camera.Ext\ct;
+ct = Camera.E\ct;
 Camera.camt = Camera.camt + ct(1:3);
 setappdata(handles.figure1,'camera',Camera);
 UpdateTick(handles);
@@ -160,7 +159,7 @@ function pushbutton_a_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 Camera = getappdata(handles.figure1,'camera');
 ct = [-1 0 0 0]';
-ct = Camera.Ext\ct;
+ct = Camera.E\ct;
 Camera.camt = Camera.camt + ct(1:3);
 setappdata(handles.figure1,'camera',Camera);
 UpdateTick(handles);
@@ -195,21 +194,16 @@ Ry = [cos(Camera.thetay) 0 -sin(Camera.thetay); 0 1 0; sin(Camera.thetay) 0 cos(
 Rz = [cos(Camera.thetaz) sin(Camera.thetaz) 0; -sin(Camera.thetaz) cos(Camera.thetaz) 0; 0 0 1];
 outputCamera.R = Rx*Ry*Rz;
 outputCamera.t = -outputCamera.R*Camera.camt;
-
-
-function outputCamera = SetP(Camera)
-outputCamera = Camera;
-outputCamera.Ext = [outputCamera.R outputCamera.t; 0 0 0 1]; 
-outputCamera.P = outputCamera.Int*[outputCamera.R outputCamera.t];
+outputCamera.E = [outputCamera.R outputCamera.t; 0 0 0 1];
 
 function DisplayTopDown(Camera, viewhandle)
 cla(viewhandle);
 axes(viewhandle);
 hold on;
 plot(0, 0,'bx');
-Yaxis = (Camera.Ext)\[0 1 0 1]';
-Zaxis = (Camera.Ext)\[0 0 1 1]';
-Xaxis = (Camera.Ext)\[1 0 0 1]';
+Yaxis = (Camera.E)\[0 1 0 1]';
+Zaxis = (Camera.E)\[0 0 1 1]';
+Xaxis = (Camera.E)\[1 0 0 1]';
 plot(Zaxis(1),Zaxis(3),'bx');
 plot(Yaxis(1),Yaxis(3),'gx');
 plot(Xaxis(1),Xaxis(3),'rx');
@@ -217,15 +211,14 @@ hold off;
 
 
 
-function [KeyFrame] = MakeKeyFrame(Camera, World)
+function [ImagePoints] = MakeImage(Camera, World)
 kfimpointcount = 0;
-KeyFrame.Camera = Camera;
-KeyFrame.ImagePoints = struct('id',1,'location',[0 0 1]','X',[0 0 0 1]');
+ImagePoints = struct('id',1,'location',[0 0 1]','X',[0 0 0 1]');
 for i = 1:length(World.points)
     ImagePoint = ProjectPoint(Camera, World.points(i));
     if (~isempty(ImagePoint))
         kfimpointcount = kfimpointcount + 1;
-        KeyFrame.ImagePoints(kfimpointcount) = ImagePoint;
+        ImagePoints(kfimpointcount) = ImagePoint;
     end
 end
 
@@ -233,10 +226,10 @@ end
 function [ImagePoint] = ProjectPoint(Camera, WorldPoint)
 ImagePoint = [];
 X = WorldPoint.location;
-nX = Camera.Ext*X;
+nX = Camera.E*X;
 nX = nX ./ nX(4);
 if (nX(3) > Camera.f)
-    x = Camera.P*X;
+    x = Camera.K*Camera.E(1:3,:)*X;
     x = x./x(3);
     if (x(1) > 1 && x(1) < 640 && x(2) > 1 && x(2) < 480)
         ImagePoint.id = WorldPoint.id;
@@ -453,12 +446,12 @@ for i = 1:size(kf1points,2)
     outpoints(i).id = ids(i);
 end
 
-function DisplayKeyFrame(KeyFrame, AxesHandle)
+function DisplayImage(ImagePoints, AxesHandle)
 cla(AxesHandle);
 axes(AxesHandle);
 hold on;
-for i = 1:length(KeyFrame.ImagePoints)
-    plot(KeyFrame.ImagePoints(i).location(1), KeyFrame.ImagePoints(i).location(2),'w');
+for i = 1:length(ImagePoints)
+    plot(ImagePoints(i).location(1), ImagePoints(i).location(2),'w');
 end
 
 
@@ -477,18 +470,17 @@ description = 'Relaxed error';
 for theta = 0:0.1:2*pi
     EstCamera = getappdata(handles.figure1,'estcamera');
     errcount = errcount + 1;
-    err2(errcount) = norm(Camera.Ext - EstCamera.Ext);
+    err2(errcount) = norm(Camera.E - EstCamera.E);
     clc
     ct = [18*cos(theta)-16 0 18*sin(theta)]';
     Camera.camt = ct;
     Camera.thetay = -theta;
     Camera = RfromEuler(Camera);
-    Camera = SetP(Camera);
 
     setappdata(handles.figure1,'camera',Camera);
     UpdateTick(handles);
     
-    err(errcount) = EstimateCamera(handles, theta);
+    err(errcount) = EstimateCamera(handles);
     save results9 err err2 description theta EstCamera Camera
 end
 
@@ -507,7 +499,8 @@ UpdateTick(handles);
 
 CurrKeyFrame = getappdata(handles.figure1,'currkeyframe');
 InitKeyFrame1 = CurrKeyFrame;
-DisplayKeyFrame(InitKeyFrame1, handles.viewkeyframe1);
+InitKeyFrame1.Camera = Camera;
+DisplayImage(InitKeyFrame1.ImagePoints, handles.viewkeyframe1);
 setappdata(handles.figure1,'initkf1',InitKeyFrame1);
 setappdata(handles.figure1,'camera',Camera);
 
@@ -527,7 +520,7 @@ UpdateTick(handles);
 
 CurrKeyFrame = getappdata(handles.figure1,'currkeyframe');
 InitKeyFrame2 = CurrKeyFrame;
-DisplayKeyFrame(InitKeyFrame2, handles.viewkeyframe2);
+DisplayImage(InitKeyFrame2.ImagePoints, handles.viewkeyframe2);
 setappdata(handles.figure1,'initkf2',InitKeyFrame2);
 
 
@@ -544,16 +537,14 @@ Camera = getappdata(handles.figure1,'camera');
 EstCamera = getappdata(handles.figure1,'estcamera');
 
 display(Camera.P);
-K = Camera.Int;
-Kinv = inv(K);
 tx = [0 0 2; 0 0 0; -2 0 0];
 E1 = 0;
 display(Camera.R);
-EstCamera.Ext = CalculateExt(InitKeyFrame1, InitKeyFrame2, Camera.Int,E1);
-EstCamera.mu(2) = 0.1;
-EstCamera.mu(4) = -2;
-EstCamera.P = K*EstCamera.Ext(1:3,:);
-P1 = K*[eye(3,3) [0;0;0]];
+EstCamera.E = CalculateExt(InitKeyFrame1, InitKeyFrame2, Camera.K,E1);
+EstCamera.P = EstCamera.K*EstCamera.E(1:3,:);
+P1 = EstCamera.K*[eye(3,3) [0;0;0]];
+
+InitKeyFrame2.Camera = EstCamera;
 
 
 newpoints = Reproject(InitKeyFrame1, InitKeyFrame2,P1,EstCamera.P);
@@ -570,18 +561,18 @@ EstWorld = getappdata(handles.figure1,'estworld');
 Camera = getappdata(handles.figure1,'camera');
 EstCamera = getappdata(handles.figure1,'estcamera');
 Camera = RfromEuler(Camera);
-Camera = SetP(Camera);
+
 
 %Display the camera external matrices and the error 
-Ext1 = Camera.Ext;
-Ext1 = round(Ext1*1000)/1000;
-set(handles.text_camext,'String',['Camera Ext: ' mat2str(Ext1)]);
+E1 = Camera.E;
+E1 = round(E1*1000)/1000;
+set(handles.text_camext,'String',['Camera E: ' mat2str(E1)]);
 
-Ext2 = EstCamera.Ext;
-Ext2 = round(Ext2*1000)/1000;
-set(handles.text_estcamext,'String',['EstCamera Ext: ' mat2str(Ext2)]);
+E2 = EstCamera.E;
+E2 = round(E2*1000)/1000;
+set(handles.text_estcamext,'String',['EstCamera E: ' mat2str(E2)]);
 
-Cam_Error = norm(Ext2 - Ext1);
+Cam_Error = norm(E2 - E1);
 set(handles.text_cameraerror,'String',['Camera Error: ' num2str(Cam_Error)]);
 
 
@@ -589,17 +580,17 @@ setappdata(handles.figure1,'camera',Camera);
 setappdata(handles.figure1,'estcamera',EstCamera);
 
 
-CurrKeyFrame = MakeKeyFrame(Camera, World);
-DisplayKeyFrame(CurrKeyFrame, handles.view3d);
+CurrKeyFrame.ImagePoints = MakeImage(Camera, World);
+DisplayImage(CurrKeyFrame.ImagePoints, handles.view3d);
 
 
 
 setappdata(handles.figure1,'currkeyframe',CurrKeyFrame);
 DisplayTopDown(Camera,handles.viewtopdown);
 
-EstCurrKeyFrame = MakeKeyFrame(EstCamera, EstWorld);
-DisplayKeyFrame(EstCurrKeyFrame, handles.view3dest);
-setappdata(handles.figure1,'estcurrkeyframe',EstCurrKeyFrame);
+EstImagePoints = MakeImage(EstCamera, EstWorld);
+DisplayImage(EstImagePoints, handles.view3dest);
+% setappdata(handles.figure1,'estcurrkeyframe',EstCurrKeyFrame);
 DisplayTopDown(EstCamera,handles.viewtopdownest);
 
 
@@ -622,19 +613,19 @@ function pushbutton_update_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 UpdateTick(handles);
 
-function error = EstimateCamera(handles, theta)
+function error = EstimateCamera(handles)
 World = getappdata(handles.figure1,'world');
 EstWorld = getappdata(handles.figure1,'estworld');
 Camera = getappdata(handles.figure1,'camera');
 EstCamera = getappdata(handles.figure1,'estcamera');
 
-CurrKeyFrame = MakeKeyFrame(Camera, World);
+CurrKeyFrame.ImagePoints = MakeImage(Camera, World);
 
 
 
-Ein = EstCamera.Ext;
+Ein = EstCamera.E;
 
-K = EstCamera.Int;
+K = EstCamera.K;
 XX = [];
 detection = [];
 npoints = 50;
@@ -642,13 +633,16 @@ error = 10;
 
 
 [X x] = FindMatches(EstWorld, CurrKeyFrame,npoints);
-[muout error] = estimatepose(Ein,K,X,x,300);
-
-
-
-EstCamera.Ext = expmap(muout)*Ein;
-EstCamera.mu = muout;
-EstCamera.P = K*EstCamera.Ext(1:3,:);
+if (size(X,2) > 10)
+    display('Estimating pose...');
+    [muout error] = estimatepose(Ein,K,X,x,300);
+    EstCamera.E = expmap(muout)*Ein;
+    EstCamera.mu = muout;
+    EstCamera.P = K*EstCamera.E(1:3,:);
+    display('Done estimating!');
+else
+    display('Not enough points to estimate pose');
+end
 
 setappdata(handles.figure1,'estcamera',EstCamera);
 UpdateTick(handles);
@@ -673,3 +667,12 @@ for i = 1:npoints
         end
     end
 end
+
+
+% --- Executes on button press in pushbutton_addkeyframe.
+function pushbutton_addkeyframe_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton_addkeyframe (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
