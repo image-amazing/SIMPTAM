@@ -22,7 +22,7 @@ function varargout = proj(varargin)
 
 % Edit the above text to modify the response to help proj
 
-% Last Modified by GUIDE v2.5 15-Apr-2013 15:03:08
+% Last Modified by GUIDE v2.5 18-Apr-2013 12:07:13
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -70,6 +70,7 @@ Camera.R = eye(3,3);
 Camera.t = zeros(3,1);
 Camera.Ext = [Camera.R Camera.t; 0 0 0 1];
 Camera.mu = [0 0 0 0 0 0];
+Camera.P = Camera.Int*Camera.Ext(1:3,:);
 setappdata(handles.figure1,'camera',Camera);
 EstCamera = Camera;
 setappdata(handles.figure1,'estcamera',EstCamera);
@@ -82,6 +83,7 @@ setappdata(handles.figure1,'initkf2',InitKeyFrame2);
 
 EstWorld.points(1).location = [0 0 0 1]';
 EstWorld.points(1).id = -1;
+EstWorld.points = World.points;
 setappdata(handles.figure1,'estworld',EstWorld);
 
 UpdateTick(handles)
@@ -459,21 +461,35 @@ for i = 1:length(KeyFrame.ImagePoints)
     plot(KeyFrame.ImagePoints(i).location(1), KeyFrame.ImagePoints(i).location(2),'w');
 end
 
+
 % --- Executes on button press in pushbutton_path.
 function pushbutton_path_Callback(hObject, eventdata, handles)
 % hObject    handle to pushbutton_path (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+
 Camera = getappdata(handles.figure1,'camera');
-for theta = 0:0.001:2*pi
+EstCamera = getappdata(handles.figure1,'estcamera');
+errcount = 0;
+err = [];
+err2 = [];
+description = 'Relaxed error';
+for theta = 0:0.1:2*pi
+    EstCamera = getappdata(handles.figure1,'estcamera');
+    errcount = errcount + 1;
+    err2(errcount) = norm(Camera.Ext - EstCamera.Ext);
     clc
     ct = [18*cos(theta)-16 0 18*sin(theta)]';
     Camera.camt = ct;
     Camera.thetay = -theta;
+    Camera = RfromEuler(Camera);
+    Camera = SetP(Camera);
+
     setappdata(handles.figure1,'camera',Camera);
     UpdateTick(handles);
     
-    EstimateCamera(handles);
+    err(errcount) = EstimateCamera(handles, theta);
+    save results9 err err2 description theta EstCamera Camera
 end
 
 
@@ -575,6 +591,9 @@ setappdata(handles.figure1,'estcamera',EstCamera);
 
 CurrKeyFrame = MakeKeyFrame(Camera, World);
 DisplayKeyFrame(CurrKeyFrame, handles.view3d);
+
+
+
 setappdata(handles.figure1,'currkeyframe',CurrKeyFrame);
 DisplayTopDown(Camera,handles.viewtopdown);
 
@@ -603,7 +622,7 @@ function pushbutton_update_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 UpdateTick(handles);
 
-function EstimateCamera(handles)
+function error = EstimateCamera(handles, theta)
 World = getappdata(handles.figure1,'world');
 EstWorld = getappdata(handles.figure1,'estworld');
 Camera = getappdata(handles.figure1,'camera');
@@ -612,34 +631,45 @@ EstCamera = getappdata(handles.figure1,'estcamera');
 CurrKeyFrame = MakeKeyFrame(Camera, World);
 
 
-muin = EstCamera.mu;
-E = expmap(muin);
+
+Ein = EstCamera.Ext;
+
 K = EstCamera.Int;
 XX = [];
 detection = [];
+npoints = 50;
+error = 10;
 
 
-[X x] = FindMatches(EstWorld, CurrKeyFrame);
+[X x] = FindMatches(EstWorld, CurrKeyFrame,npoints);
+[muout error] = estcam3(Ein,K,X,x,300);
 
 
-[muout Eout] = estcam(muin,K,X(:,1:20),x(:,1:20),2000,Camera.Ext);
-EstCamera.Ext = expmap(muout);
+
+EstCamera.Ext = expmap(muout)*Ein;
 EstCamera.mu = muout;
+EstCamera.P = K*EstCamera.Ext(1:3,:);
 
 setappdata(handles.figure1,'estcamera',EstCamera);
 UpdateTick(handles);
 
 
-function [X x] = FindMatches(World, KeyFrame)
+function [X x] = FindMatches(World, KeyFrame,npoints)
 X = [];
 x = [];
+
 for i = 1:size(KeyFrame.ImagePoints,2)
+    input(1:3,i) = KeyFrame.ImagePoints(i).location;
+    input(4,i) = KeyFrame.ImagePoints(i).id;
+end
+
+input = input(:,randperm(size(input,2)));
+
+for i = 1:npoints
     for j = 1:size(World.points,2)
-        if (World.points(j).id == KeyFrame.ImagePoints(i).id)
+        if (World.points(j).id == input(4,i))
             X = [X World.points(j).location];
-            x = [x KeyFrame.ImagePoints(i).location];
+            x = [x input(1:3,i)];
         end
     end
 end
-
-
