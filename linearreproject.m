@@ -1,4 +1,4 @@
-function [ X ] = linearreproject(match1, match2, P1, P2)
+function [ X ] = linearreproject(match1, match2, P1, P2,XX)
 
 %Separate projection matrices into rows
 P1_1 = P1(1,:);
@@ -23,8 +23,8 @@ A = [x1*P1_3 - P1_1;
 
 X = V(:,4);
 X = X./X(4);
+X = single(X);
 
 
 
 end
-

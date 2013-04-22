@@ -22,7 +22,7 @@ function varargout = proj(varargin)
 
 % Edit the above text to modify the response to help proj
 
-% Last Modified by GUIDE v2.5 18-Apr-2013 14:38:03
+% Last Modified by GUIDE v2.5 19-Apr-2013 14:43:26
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -52,8 +52,7 @@ function proj_OpeningFcn(hObject, eventdata, handles, varargin)
 % handles    structure with handles and user data (see GUIDATA)
 % varargin   command line arguments to proj (see VARARGIN)
 clc;
-World.points = generateworldpoints2();
-setappdata(handles.figure1,'world',World);
+Map.points = generateworldpoints2();
 
 Camera.f = 0.5;
 ay = 480*Camera.f;
@@ -69,21 +68,28 @@ Camera.thetaz = 0;
 Camera.R = eye(3,3);
 Camera.t = zeros(3,1);
 Camera.E = [Camera.R Camera.t; 0 0 0 1];
-Camera.P = Camera.K*Camera.E(1:3,:);
-setappdata(handles.figure1,'camera',Camera);
-EstCamera = Camera;
-setappdata(handles.figure1,'estcamera',EstCamera);
+
+World.Camera = Camera;
+World.Map = Map;
+PTAM.Camera = Camera;
+
+
+PTAM.Map = [];
+PTAM.Map.points(1).location = [0 0 0 0]';
+PTAM.Map.points(1).id = -1;
+PTAM.kfcount = 0;
+
+% PTAM.KeyFrames = struct([]);
+
+setappdata(handles.figure1,'world',World);
+setappdata(handles.figure1,'ptam',PTAM);
+
+theta = 0;
+setappdata(handles.figure1,'theta',theta);
 
 InitKeyFrame1 = [];
 InitKeyFrame2 = [];
-setappdata(handles.figure1,'initkf1',InitKeyFrame1);
-setappdata(handles.figure1,'initkf2',InitKeyFrame2);
 
-
-EstWorld.points(1).location = [0 0 0 1]';
-EstWorld.points(1).id = -1;
-% EstWorld.points = World.points;
-setappdata(handles.figure1,'estworld',EstWorld);
 
 UpdateTick(handles)
 
@@ -120,11 +126,11 @@ function pushbutton_w_Callback(hObject, eventdata, handles)
 % hObject    handle to pushbutton_w (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-Camera = getappdata(handles.figure1,'camera');
+World = getappdata(handles.figure1,'world');
 ct = [0 0 1 0]';
-ct = Camera.E\ct;
-Camera.camt = Camera.camt + ct(1:3);
-setappdata(handles.figure1,'camera',Camera);
+ct = World.Camera.E\ct;
+World.Camera.camt = World.Camera.camt + ct(1:3);
+setappdata(handles.figure1,'world',World);
 UpdateTick(handles);
 
 
@@ -133,11 +139,11 @@ function pushbutton_d_Callback(hObject, eventdata, handles)
 % hObject    handle to pushbutton_d (see GCBOfh = figure('Position',[250 250 350 35)
 % eventdata  reserved - to be defined i4n a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-Camera = getappdata(handles.figure1,'camera');
+World = getappdata(handles.figure1,'world');
 ct = [1 0 0 0]';
-ct = Camera.E\ct;
-Camera.camt = Camera.camt + ct(1:3);
-setappdata(handles.figure1,'camera',Camera);
+ct =  World.Camera.E\ct;
+ World.Camera.camt =  World.Camera.camt + ct(1:3);
+setappdata(handles.figure1,'world',World);
 UpdateTick(handles);
 
 % --- Executes on button press in pushbutton_s.
@@ -145,11 +151,11 @@ function pushbutton_s_Callback(hObject, eventdata, handles)
 % hObject    handle to pushbutton_s (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-Camera = getappdata(handles.figure1,'camera');
+World = getappdata(handles.figure1,'world');
 ct = [0 0 -1 0]';
-ct = Camera.E\ct;
-Camera.camt = Camera.camt + ct(1:3);
-setappdata(handles.figure1,'camera',Camera);
+ct = World.Camera.E\ct;
+World.Camera.camt = World.Camera.camt + ct(1:3);
+setappdata(handles.figure1,'world',World);
 UpdateTick(handles);
 
 % --- Executes on button press in pushbutton_a.
@@ -157,11 +163,11 @@ function pushbutton_a_Callback(hObject, eventdata, handles)
 % hObject    handle to pushbutton_a (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-Camera = getappdata(handles.figure1,'camera');
+World = getappdata(handles.figure1,'world');
 ct = [-1 0 0 0]';
-ct = Camera.E\ct;
-Camera.camt = Camera.camt + ct(1:3);
-setappdata(handles.figure1,'camera',Camera);
+ct = World.Camera.E\ct;
+World.Camera.camt = World.Camera.camt + ct(1:3);
+setappdata(handles.figure1,'world',World);
 UpdateTick(handles);
 
 % --- Executes on button press in pushbutton_right.
@@ -169,10 +175,10 @@ function pushbutton_right_Callback(hObject, eventdata, handles)
 % hObject    handle to pushbutton_right (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handes and user data (see GUIDATA)
-Camera = getappdata(handles.figure1,'camera');
-Camera.thetay = Camera.thetay + 0.1;
+World = getappdata(handles.figure1,'world');
+World.Camera.thetay = World.Camera.thetay + 0.1;
 guidata(handles.figure1,handles);
-setappdata(handles.figure1,'camera',Camera);
+setappdata(handles.figure1,'world',World);
 UpdateTick(handles);
 
 
@@ -182,9 +188,9 @@ function pushbutton_left_Callback(hObject, eventdata, handles)
 % hObject    handle to pushbutton_left (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles anmydata = guidata(hObject);d user data (see GUIDATA)
-Camera = getappdata(handles.figure1,'camera');
-Camera.thetay = Camera.thetay - 0.1;
-setappdata(handles.figure1,'camera',Camera);
+World = getappdata(handles.figure1,'world');
+World.Camera.thetay = World.Camera.thetay - 0.1;
+setappdata(handles.figure1,'world',World);
 UpdateTick(handles);
 
 function outputCamera = RfromEuler(Camera)
@@ -209,11 +215,25 @@ plot(Yaxis(1),Yaxis(3),'gx');
 plot(Xaxis(1),Xaxis(3),'rx');
 hold off;
 
+function DisplayKeyFrames(KeyFrames, viewhandle)
+axes(viewhandle);
+hold on;
+
+for i = 1:size(KeyFrames,2)
+    Yaxis = (KeyFrames(i).Camera.E)\[0 1 0 1]';
+    Zaxis = (KeyFrames(i).Camera.E)\[0 0 1 1]';
+    Xaxis = (KeyFrames(i).Camera.E)\[1 0 0 1]';
+    plot(Xaxis(1),Xaxis(3),'x','Color',[0.5 0 0]);
+    plot(Yaxis(1),Yaxis(3),'x','Color',[0 0.5 0]);
+    plot(Zaxis(1),Zaxis(3),'x','Color',[0 0 0.5]);
+end
+hold off;
+
 
 
 function [ImagePoints] = MakeImage(Camera, World)
 kfimpointcount = 0;
-ImagePoints = struct('id',1,'location',[0 0 1]','X',[0 0 0 1]');
+ImagePoints = struct('id',1,'location',[0 0 1]','location2',[0 0 1]' ,'X',[0 0 0 1]');
 for i = 1:length(World.points)
     ImagePoint = ProjectPoint(Camera, World.points(i));
     if (~isempty(ImagePoint))
@@ -231,9 +251,14 @@ nX = nX ./ nX(4);
 if (nX(3) > Camera.f)
     x = Camera.K*Camera.E(1:3,:)*X;
     x = x./x(3);
+    
+    x2 = double(Camera.E(1:3,:)*X);
+    x2 = x2./x2(3);
+
     if (x(1) > 1 && x(1) < 640 && x(2) > 1 && x(2) < 480)
         ImagePoint.id = WorldPoint.id;
         ImagePoint.location = [x(1) x(2) 1]';
+        ImagePoint.location2 = [double(x2(1)) double(x2(2)) 1]';
         ImagePoint.X = X;
     end
 end    
@@ -245,8 +270,7 @@ function pushbutton_poke_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-InitKeyFrame1 = getappdata(handles.figure1,'initkf1');
-InitKeyFrame2 = getappdata(handles.figure1,'initkf2');
+
 CurrKeyFrame = getappdata(handles.figure1,'currkeyframe');
 World = getappdata(handles.figure1,'world');
 
@@ -270,7 +294,7 @@ else
     
 end
 
-function Ext = CalculateExt(Keyframe1, Keyframe2,K, F1)
+function Ext = CalculateExt(Keyframe1, Keyframe2,K)
 
 kf1points = []; 
 kf2points = [];
@@ -280,8 +304,12 @@ ids2 = [];
 for i = 1:length(Keyframe1.ImagePoints)
     for j = 1:length(Keyframe2.ImagePoints)
         if (Keyframe1.ImagePoints(i).id == Keyframe2.ImagePoints(j).id)
-            kf1points = [kf1points Keyframe1.ImagePoints(i).location];
-            kf2points = [kf2points Keyframe2.ImagePoints(j).location];
+            kf1p = Keyframe1.ImagePoints(i).location;
+            kf1p = kf1p / kf1p(3);
+            kf2p = Keyframe2.ImagePoints(j).location;
+            kf2p = kf2p / kf2p(3);
+            kf1points = [kf1points kf1p];
+            kf2points = [kf2points kf2p];
             ids = [ids Keyframe1.ImagePoints(i).id];
             ids2 = [ids2 Keyframe2.ImagePoints(j).id];
             
@@ -290,6 +318,11 @@ for i = 1:length(Keyframe1.ImagePoints)
     end
 end
 
+perm = randperm(size(kf1points,2));
+kf1points = kf1points(:,perm);
+kf2points = kf2points(:,perm);
+kf1points = kf1points(:,1:12);
+kf2points = kf2points(:,1:12);
 
 F = fundmatrix(kf1points,kf2points);
 % F = vgg_F_from_7pts_2img(kf1points(:,1:7),kf2points(:,1:7));
@@ -313,11 +346,11 @@ R2 = U*W'*V';
 % display(R1);
 % display(R2);
 
-P = K*[eye(3,3) zeros(3,1)];
-P1 = K*[R1 t1];
-P2 = K*[R1 t2];
-P3 = K*[R2 t1];
-P4 = K*[R2 t2];
+P = [eye(3,3) zeros(3,1)];
+P1 = [R1 t1];
+P2 = [R1 t2];
+P3 = [R2 t1];
+P4 = [R2 t2];
 
 
 
@@ -328,10 +361,10 @@ error3 = 0;
 error4 = 0;
 
 for i = 1:size(kf1points,2)
-    X1 = linearreproject(kf1points(:,i),kf2points(:,i),P,P1);
-    X2 = linearreproject(kf1points(:,i),kf2points(:,i),P,P2);
-    X3 = linearreproject(kf1points(:,i),kf2points(:,i),P,P3);
-    X4 = linearreproject(kf1points(:,i),kf2points(:,i),P,P4);
+    X1 = linearreproject(K\kf1points(:,i),K\kf2points(:,i),P,P1);
+    X2 = linearreproject(K\kf1points(:,i),K\kf2points(:,i),P,P2);
+    X3 = linearreproject(K\kf1points(:,i),K\kf2points(:,i),P,P3);
+    X4 = linearreproject(K\kf1points(:,i),K\kf2points(:,i),P,P4);
     
     if (X1(3)>0)
         X1 = [R1 t1; 0 0 0 1]*X1;
@@ -397,53 +430,48 @@ t = t*scale;
 display(R);
 display(t);
 
+R = single(R);
+t = single(t);
+
+
 Ext = [R t; 0 0 0 1];
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-function outpoints = Reproject(Keyframe1, Keyframe2, P1, P2)
+function outpoints = Reproject(Keyframe1, Keyframe2, E1, E2,K)
 
 kf1points = []; 
 kf2points = [];
 ids = [];
+X = [];
 
 for i = 1:length(Keyframe1.ImagePoints)
     for j = 1:length(Keyframe2.ImagePoints)
         if (Keyframe1.ImagePoints(i).id == Keyframe2.ImagePoints(j).id)
-            kf1points = [kf1points Keyframe1.ImagePoints(i).location];
-            kf2points = [kf2points Keyframe2.ImagePoints(j).location];
+
+            kf1p = K\Keyframe1.ImagePoints(i).location;
+            kf1p = kf1p / kf1p(3);
+            kf2p = K\Keyframe2.ImagePoints(j).location;
+            kf2p = kf2p / kf2p(3);
+            
+            kf1points = [kf1points kf1p];
+            kf2points = [kf2points kf2p];
             ids = [ids Keyframe1.ImagePoints(i).id];
+%             X = [X inpoints(Keyframe1.ImagePoints(i).id).location];
             
         end
         
     end
 end
 
-X = [];
-
+outpoints = [];
+XX = [];
 for i = 1:size(kf1points,2)
-    newpoint = linearreproject(kf1points(:,i),kf2points(:,i),P1,P2);
-    X = [X newpoint];
-    outpoints(i).location = newpoint;
-    outpoints(i).id = ids(i);
+    newpoint = linearreproject(kf1points(:,i),kf2points(:,i),E1,E2);
+    if ~isempty(newpoint)
+        XX = [XX newpoint];
+        outpoints(i).location = newpoint;
+        outpoints(i).id = ids(i);
+    end
 end
 
 function DisplayImage(ImagePoints, AxesHandle)
@@ -461,27 +489,26 @@ function pushbutton_path_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-Camera = getappdata(handles.figure1,'camera');
-EstCamera = getappdata(handles.figure1,'estcamera');
-errcount = 0;
-err = [];
-err2 = [];
-description = 'Relaxed error';
-for theta = 0:0.1:2*pi
-    EstCamera = getappdata(handles.figure1,'estcamera');
-    errcount = errcount + 1;
-    err2(errcount) = norm(Camera.E - EstCamera.E);
-    clc
-    ct = [18*cos(theta)-16 0 18*sin(theta)]';
-    Camera.camt = ct;
-    Camera.thetay = -theta;
-    Camera = RfromEuler(Camera);
+World = getappdata(handles.figure1,'world');
+keycount = 0;
 
-    setappdata(handles.figure1,'camera',Camera);
+for theta = 0.1:0.1:2*pi
+    keycount = keycount + 1;
     UpdateTick(handles);
+    ct = [18*cos(theta)-16 0 18*sin(theta)]';
+    World.Camera.camt = ct;
+    World.Camera.thetay = -theta;
+    World.Camera = RfromEuler( World.Camera);
+    setappdata(handles.figure1,'world',World);
+    setappdata(handles.figure1,'theta',theta);
     
-    err(errcount) = EstimateCamera(handles);
-    save results9 err err2 description theta EstCamera Camera
+    EstimateCamera(handles);
+    UpdateTick(handles);  
+    if keycount > 0
+        AddKeyFrame(handles);
+        keycount = 0;
+    end
+    
 end
 
 
@@ -490,110 +517,108 @@ function pushbutton_init1_Callback(hObject, eventdata, handles)
 % hObject    handle to pushbutton_init1 (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-Camera = getappdata(handles.figure1,'camera');
+World = getappdata(handles.figure1,'world');
+PTAM = getappdata(handles.figure1,'ptam');
 ct = [0 0 0]';
-Camera.camt = ct;
-Camera.thetay = 0;
-setappdata(handles.figure1,'camera',Camera);
+World.Camera.camt = ct;
+World.Camera.thetay = 0;
+setappdata(handles.figure1,'world',World);
 UpdateTick(handles);
 
 CurrKeyFrame = getappdata(handles.figure1,'currkeyframe');
-InitKeyFrame1 = CurrKeyFrame;
-InitKeyFrame1.Camera = Camera;
-DisplayImage(InitKeyFrame1.ImagePoints, handles.viewkeyframe1);
-setappdata(handles.figure1,'initkf1',InitKeyFrame1);
-setappdata(handles.figure1,'camera',Camera);
-
-
+PTAM.KeyFrames(1) = CurrKeyFrame;
+PTAM.kfcount = 1;
+DisplayImage(PTAM.KeyFrames(1).ImagePoints, handles.viewkeyframe1);
+setappdata(handles.figure1,'ptam',PTAM);
 
 % --- Executes on button press in pushbutton_init2.
 function pushbutton_init2_Callback(hObject, eventdata, handles)
 % hObject    handle to pushbutton_init2 (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-Camera = getappdata(handles.figure1,'camera');
+World = getappdata(handles.figure1,'world');
+PTAM = getappdata(handles.figure1,'ptam');
 ct = [2 0 0]';
-Camera.camt = ct;
-Camera.thetay = -0.1;
-setappdata(handles.figure1,'camera',Camera);
+World.Camera.camt = ct;
+World.Camera.thetay = -0.1;
+setappdata(handles.figure1,'world',World);
 UpdateTick(handles);
 
 CurrKeyFrame = getappdata(handles.figure1,'currkeyframe');
-InitKeyFrame2 = CurrKeyFrame;
-DisplayImage(InitKeyFrame2.ImagePoints, handles.viewkeyframe2);
-setappdata(handles.figure1,'initkf2',InitKeyFrame2);
-
-
+PTAM.KeyFrames(2) = CurrKeyFrame;
+PTAM.kfcount = 2;
+DisplayImage(PTAM.KeyFrames(2).ImagePoints, handles.viewkeyframe2);
+setappdata(handles.figure1,'ptam',PTAM);
 
 % --- Executes on button press in pushbutton_reproject.
 function pushbutton_reproject_Callback(hObject, eventdata, handles)
 % hObject    handle to pushbutton_reproject (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-InitKeyFrame1 = getappdata(handles.figure1,'initkf1');
-InitKeyFrame2 = getappdata(handles.figure1,'initkf2');
 World = getappdata(handles.figure1,'world');
-Camera = getappdata(handles.figure1,'camera');
-EstCamera = getappdata(handles.figure1,'estcamera');
+PTAM = getappdata(handles.figure1,'ptam');
 
-display(Camera.P);
-tx = [0 0 2; 0 0 0; -2 0 0];
-E1 = 0;
-display(Camera.R);
-EstCamera.E = CalculateExt(InitKeyFrame1, InitKeyFrame2, Camera.K,E1);
-EstCamera.P = EstCamera.K*EstCamera.E(1:3,:);
-P1 = EstCamera.K*[eye(3,3) [0;0;0]];
+K = PTAM.Camera.K;
+display(World.Camera.R);
+PTAM.Camera = World.Camera;
+PTAM.Camera.E = CalculateExt(PTAM.KeyFrames(1), PTAM.KeyFrames(2), World.Camera.K);
 
-InitKeyFrame2.Camera = EstCamera;
+E1 = [eye(3,3) [0;0;0]];
+E2 = World.Camera.E(1:3,:);
 
 
-newpoints = Reproject(InitKeyFrame1, InitKeyFrame2,P1,EstCamera.P);
-EstWorld.points = newpoints;
-setappdata(handles.figure1,'estworld',EstWorld);
-setappdata(handles.figure1,'estcamera',EstCamera);
+
+PTAM.KeyFrames(2).Camera = PTAM.Camera;
+
+
+PTAM.Map.points = Reproject(PTAM.KeyFrames(1), PTAM.KeyFrames(2),E1,E2,K);
+
+setappdata(handles.figure1,'ptam',PTAM);
 UpdateTick(handles);
-error = calculateworlderror(World,EstWorld);
-set(handles.text_worlderror,'String',['World Error: ' num2str(error)]);
+
 
 function UpdateTick(handles)
 World = getappdata(handles.figure1,'world');
-EstWorld = getappdata(handles.figure1,'estworld');
-Camera = getappdata(handles.figure1,'camera');
-EstCamera = getappdata(handles.figure1,'estcamera');
-Camera = RfromEuler(Camera);
+PTAM = getappdata(handles.figure1,'ptam');
+World.Camera = RfromEuler(World.Camera);
 
 
 %Display the camera external matrices and the error 
-E1 = Camera.E;
+E1 = World.Camera.E;
 E1 = round(E1*1000)/1000;
-set(handles.text_camext,'String',['Camera E: ' mat2str(E1)]);
+set(handles.text_camext,'String',['World Camera E: ' mat2str(E1)]);
 
-E2 = EstCamera.E;
+E2 = PTAM.Camera.E;
 E2 = round(E2*1000)/1000;
-set(handles.text_estcamext,'String',['EstCamera E: ' mat2str(E2)]);
+set(handles.text_estcamext,'String',['PTAM Camera E: ' mat2str(E2)]);
 
 Cam_Error = norm(E2 - E1);
 set(handles.text_cameraerror,'String',['Camera Error: ' num2str(Cam_Error)]);
 
 
-setappdata(handles.figure1,'camera',Camera);
-setappdata(handles.figure1,'estcamera',EstCamera);
+[error count] = calculateworlderror(World.Map,PTAM.Map);
+set(handles.text_totalmaperror,'String',['Total Map Error: ' num2str(error)]);
+set(handles.text_mappoints,'String',['Number of Map Points: ' num2str(count)]);
+set(handles.text_averagemaperror,'String',['Average Map Error: ' num2str(error/count)]);
 
 
-CurrKeyFrame.ImagePoints = MakeImage(Camera, World);
+setappdata(handles.figure1,'world',World);
+setappdata(handles.figure1,'ptam',PTAM);
+
+
+CurrKeyFrame.ImagePoints = MakeImage(World.Camera, World.Map);
+CurrKeyFrame.Camera = PTAM.Camera;
 DisplayImage(CurrKeyFrame.ImagePoints, handles.view3d);
 
 
 
 setappdata(handles.figure1,'currkeyframe',CurrKeyFrame);
-DisplayTopDown(Camera,handles.viewtopdown);
+DisplayTopDown(World.Camera,handles.viewtopdown);
 
-EstImagePoints = MakeImage(EstCamera, EstWorld);
+EstImagePoints = MakeImage(PTAM.Camera, PTAM.Map);
 DisplayImage(EstImagePoints, handles.view3dest);
 % setappdata(handles.figure1,'estcurrkeyframe',EstCurrKeyFrame);
-DisplayTopDown(EstCamera,handles.viewtopdownest);
-
-
+DisplayTopDown(PTAM.Camera,handles.viewtopdownest);
 
 % --- Executes on button press in pushbutton_estcam.
 function pushbutton_estcam_Callback(hObject, eventdata, handles)
@@ -601,10 +626,6 @@ function pushbutton_estcam_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 EstimateCamera(handles);
-
-
-
-
 
 % --- Executes on button press in pushbutton_update.
 function pushbutton_update_Callback(hObject, eventdata, handles)
@@ -615,42 +636,42 @@ UpdateTick(handles);
 
 function error = EstimateCamera(handles)
 World = getappdata(handles.figure1,'world');
-EstWorld = getappdata(handles.figure1,'estworld');
-Camera = getappdata(handles.figure1,'camera');
-EstCamera = getappdata(handles.figure1,'estcamera');
+PTAM = getappdata(handles.figure1,'ptam');
 
-CurrKeyFrame.ImagePoints = MakeImage(Camera, World);
+CurrKeyFrame.ImagePoints = MakeImage(World.Camera, World.Map);
 
 
 
-Ein = EstCamera.E;
+Ein = PTAM.Camera.E;
 
-K = EstCamera.K;
+K = PTAM.Camera.K;
 XX = [];
 detection = [];
-npoints = 50;
+npoints = 70;
 error = 10;
 
 
-[X x] = FindMatches(EstWorld, CurrKeyFrame,npoints);
+[X x] = FindMatches(PTAM.Map, CurrKeyFrame,npoints);
 if (size(X,2) > 10)
     display('Estimating pose...');
-    [muout error] = estimatepose(Ein,K,X,x,300);
-    EstCamera.E = expmap(muout)*Ein;
-    EstCamera.mu = muout;
-    EstCamera.P = K*EstCamera.E(1:3,:);
+    [muout error] = estimatepose(Ein,K,X,x,600);
+    PTAM.Camera.E = expmap(muout)*Ein;
+    PTAM.Camera.mu = muout;
+    PTAM.Camera.P = K*PTAM.Camera.E(1:3,:);
     display('Done estimating!');
 else
     display('Not enough points to estimate pose');
 end
 
-setappdata(handles.figure1,'estcamera',EstCamera);
-UpdateTick(handles);
+setappdata(handles.figure1,'ptam',PTAM);
 
-
-function [X x] = FindMatches(World, KeyFrame,npoints)
+function [X x] = FindMatches(Map, KeyFrame,npoints)
 X = [];
 x = [];
+
+if npoints > size(KeyFrame.ImagePoints,2)
+    npoints = size(KeyFrame.ImagePoints,2);
+end
 
 for i = 1:size(KeyFrame.ImagePoints,2)
     input(1:3,i) = KeyFrame.ImagePoints(i).location;
@@ -660,9 +681,9 @@ end
 input = input(:,randperm(size(input,2)));
 
 for i = 1:npoints
-    for j = 1:size(World.points,2)
-        if (World.points(j).id == input(4,i))
-            X = [X World.points(j).location];
+    for j = 1:size(Map.points,2)
+        if (Map.points(j).id == input(4,i))
+            X = [X Map.points(j).location];
             x = [x input(1:3,i)];
         end
     end
@@ -674,5 +695,98 @@ function pushbutton_addkeyframe_Callback(hObject, eventdata, handles)
 % hObject    handle to pushbutton_addkeyframe (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+AddKeyFrame(handles);
+
+function AddKeyFrame(handles)
+UpdateTick(handles);
+PTAM = getappdata(handles.figure1,'ptam');
+CurrKeyFrame = getappdata(handles.figure1,'currkeyframe');
+
+PTAM.kfcount = PTAM.kfcount + 1;
+PTAM.KeyFrames(PTAM.kfcount) = CurrKeyFrame;
+DisplayKeyFrames(PTAM.KeyFrames, handles.viewtopdownest);
 
 
+% Add some world points from this keyframe
+KeyFrame1 = CurrKeyFrame;
+KeyFrame2 =  FindClosestKeyFrame(PTAM.kfcount, PTAM.KeyFrames);
+DisplayImage(KeyFrame1.ImagePoints, handles.viewkeyframe1);
+DisplayImage(KeyFrame2.ImagePoints, handles.viewkeyframe2);
+
+E1 = KeyFrame1.Camera.E(1:3,:);
+E2 = KeyFrame2.Camera.E(1:3,:);
+K = KeyFrame1.Camera.K;
+
+outpoints = Reproject(KeyFrame1, KeyFrame2, E1, E2, K);
+origsize = size(outpoints,2);
+origmapsize = size(PTAM.Map.points,2);
+PTAM.Map = AppendMap(PTAM.Map,outpoints);
+newmapsize = size(PTAM.Map.points,2);
+pointsadded = newmapsize-origmapsize;
+
+display([int2str(pointsadded) ' points added out of ' int2str(origsize)]);
+setappdata(handles.figure1,'ptam',PTAM);
+UpdateTick(handles);
+
+
+% --- Executes on button press in pushbutton_pathstep.
+function pushbutton_pathstep_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton_pathstep (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+theta = getappdata(handles.figure1,'theta');
+World = getappdata(handles.figure1,'world');
+theta = theta + 0.1;
+ct = [18*cos(theta)-16 0 18*sin(theta)]';
+World.Camera.camt = ct;
+World.Camera.thetay = -theta;
+World.Camera = RfromEuler(World.Camera);
+setappdata(handles.figure1,'world',World);
+setappdata(handles.figure1,'theta',theta);
+EstimateCamera(handles);
+UpdateTick(handles);
+
+
+% --- Executes on button press in pushbutton_displaykf.
+function pushbutton_displaykf_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton_displaykf (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+PTAM = getappdata(handles.figure1,'ptam');
+DisplayKeyFrames(PTAM.KeyFrames, handles.viewtopdownest);
+
+function kfout = FindClosestKeyFrame(kfcount, KeyFrames)
+mindist = 1000;
+minkfcount = 0;
+
+
+for i = 1:size(KeyFrames,2)
+    if i ~= kfcount 
+        dist = norm(KeyFrames(i).Camera.E(1:3,4) - KeyFrames(kfcount).Camera.E(1:3,4));
+        if dist < mindist 
+            mindist = dist;
+            minkfcount = i;
+        end
+    end
+end
+
+kfout = KeyFrames(minkfcount);
+
+
+function outMap = AppendMap(inMap,points)
+
+outMap = inMap;
+
+for i = 1:size(points,2)
+    haspoint = false;
+    for j = 1:size(inMap.points,2)
+        if points(i).id == inMap.points(j).id
+            haspoint = true;
+        end
+    end
+    if haspoint == false
+            outMap.points(size(outMap.points,2)+1) = points(i);
+    end
+    
+            
+end
