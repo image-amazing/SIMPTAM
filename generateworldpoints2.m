@@ -9,7 +9,7 @@ xmax = 4;
 zmin = -20;
 zmax = 20;
 
-pdensity = 10;
+pdensity = 8;
 
 Corners = [xmin ymin zmin; xmin ymax zmin; xmax ymin zmin]';
 wall1 = pointcloudplane(Corners, pdensity);

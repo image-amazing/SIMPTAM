@@ -22,16 +22,16 @@ function varargout = proj(varargin)
 
 % Edit the above text to modify the response to help proj
 
-% Last Modified by GUIDE v2.5 19-Apr-2013 14:43:26
+% Last Modified by GUIDE v2.5 24-Apr-2013 13:45:40
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
 gui_State = struct('gui_Name',       mfilename, ...
-                   'gui_Singleton',  gui_Singleton, ...
-                   'gui_OpeningFcn', @proj_OpeningFcn, ...
-                   'gui_OutputFcn',  @proj_OutputFcn, ...
-                   'gui_LayoutFcn',  [] , ...
-                   'gui_Callback',   []);
+    'gui_Singleton',  gui_Singleton, ...
+    'gui_OpeningFcn', @proj_OpeningFcn, ...
+    'gui_OutputFcn',  @proj_OutputFcn, ...
+    'gui_LayoutFcn',  [] , ...
+    'gui_Callback',   []);
 if nargin && ischar(varargin{1})
     gui_State.gui_Callback = str2func(varargin{1});
 end
@@ -54,7 +54,7 @@ function proj_OpeningFcn(hObject, eventdata, handles, varargin)
 clc;
 Map.points = generateworldpoints2();
 
-Camera.f = 1;
+Camera.f = 0.5;
 ay = 480*Camera.f;
 ax = 640*Camera.f;
 u0 = 640/2;
@@ -63,7 +63,7 @@ Camera.K = [ax 0 u0; 0 ay v0; 0 0 1];
 
 Camera.camt = [0 0 0]';
 Camera.thetax = 0;
-Camera.thetay = 0;    
+Camera.thetay = 0;
 Camera.thetaz = 0;
 Camera.R = eye(3,3);
 Camera.t = zeros(3,1);
@@ -111,7 +111,7 @@ guidata(hObject, handles);
 
 
 % --- Outputs from this function are returned to the command line.
-function varargout = proj_OutputFcn(hObject, eventdata, handles) 
+function varargout = proj_OutputFcn(hObject, eventdata, handles)
 % varargout  cell array for returning output args (see VARARGOUT);
 % hObject    handle to figure
 % eventdata  reserved - to be defined in a future version of MATLAB
@@ -142,7 +142,7 @@ function pushbutton_d_Callback(hObject, eventdata, handles)
 World = getappdata(handles.figure1,'world');
 ct = [1 0 0 0]';
 ct =  World.Camera.E\ct;
- World.Camera.camt =  World.Camera.camt + ct(1:3);
+World.Camera.camt =  World.Camera.camt + ct(1:3);
 setappdata(handles.figure1,'world',World);
 UpdateTick(handles);
 
@@ -254,14 +254,14 @@ if (nX(3) > Camera.f)
     
     x2 = double(Camera.E(1:3,:)*X);
     x2 = x2./x2(3);
-
+    
     if (x(1) > 1 && x(1) < 640 && x(2) > 1 && x(2) < 480)
         ImagePoint.id = WorldPoint.id;
         ImagePoint.location = [x(1) x(2) 1]';
         ImagePoint.location2 = [double(x2(1)) double(x2(2)) 1]';
         ImagePoint.X = X;
     end
-end    
+end
 
 
 % --- Executes on button press in pushbutton_poke.
@@ -289,14 +289,14 @@ else
         error = calculateworlderror(World,EstWorld);
         display(error);
     end
-
+    
     
     
 end
 
-function Ext = CalculateExt(Keyframe1, Keyframe2,K, F1)
+function Ext = CalculateExt(Keyframe1, Keyframe2,K)
 
-kf1points = []; 
+kf1points = [];
 kf2points = [];
 ids = [];
 ids2 = [];
@@ -304,8 +304,12 @@ ids2 = [];
 for i = 1:length(Keyframe1.ImagePoints)
     for j = 1:length(Keyframe2.ImagePoints)
         if (Keyframe1.ImagePoints(i).id == Keyframe2.ImagePoints(j).id)
-            kf1points = [kf1points Keyframe1.ImagePoints(i).location];
-            kf2points = [kf2points Keyframe2.ImagePoints(j).location];
+            kf1p = Keyframe1.ImagePoints(i).location;
+            kf1p = kf1p / kf1p(3);
+            kf2p = Keyframe2.ImagePoints(j).location;
+            kf2p = kf2p / kf2p(3);
+            kf1points = [kf1points kf1p];
+            kf2points = [kf2points kf2p];
             ids = [ids Keyframe1.ImagePoints(i).id];
             ids2 = [ids2 Keyframe2.ImagePoints(j).id];
             
@@ -314,103 +318,121 @@ for i = 1:length(Keyframe1.ImagePoints)
     end
 end
 
+R = [];
+t = [];
 
-F = fundmatrix(kf1points,kf2points);
-% F = vgg_F_from_7pts_2img(kf1points(:,1:7),kf2points(:,1:7));
-display(F);
-E = K'*F*K;
-t = null(E');
-display(t);
-t1 = t;
-t2 = -t;
-
-
-
-
-[U, S, V] = svd(E);
-
-W = [0 -1 0; 1 0 0; 0 0 1];
-
-R1 = U*W*V';
-R2 = U*W'*V';
-
-% display(R1);
-% display(R2);
-
-P = K*[eye(3,3) zeros(3,1)];
-P1 = K*[R1 t1];
-P2 = K*[R1 t2];
-P3 = K*[R2 t1];
-P4 = K*[R2 t2];
-
-
-
-
-error1 = 0;
-error2 = 0;
-error3 = 0;
-error4 = 0;
-
-for i = 1:size(kf1points,2)
-    X1 = linearreproject(kf1points(:,i),kf2points(:,i),P,P1);
-    X2 = linearreproject(kf1points(:,i),kf2points(:,i),P,P2);
-    X3 = linearreproject(kf1points(:,i),kf2points(:,i),P,P3);
-    X4 = linearreproject(kf1points(:,i),kf2points(:,i),P,P4);
+while isempty(R)
     
-    if (X1(3)>0)
-        X1 = [R1 t1; 0 0 0 1]*X1;
-        error1 = error1 + (X1(3)<0);
-    else
-        error1 = error1 + 1;
+    
+    perm = randperm(size(kf1points,2));
+    kf1points = kf1points(:,perm);
+    kf2points = kf2points(:,perm);
+    % kf1points = kf1points(:,1:12);
+    % kf2points = kf2points(:,1:12);
+    
+    F = fundmatrix(kf1points,kf2points);
+    % F = vgg_F_from_7pts_2img(kf1points(:,1:7),kf2points(:,1:7));
+    display(F);
+    E = K'*F*K;
+    t = null(E');
+    display(t);
+    t1 = t;
+    t2 = -t;
+    
+    for i = 1:size(kf1points,2)
+        kf
+    
+    
+    
+    
+    [U, S, V] = svd(E);
+    
+    W = [0 -1 0; 1 0 0; 0 0 1];
+    
+    R1 = U*W*V';
+    R2 = U*W'*V';
+    
+    % display(R1);
+    % display(R2);
+    
+    P = [eye(3,3) zeros(3,1)];
+    P1 = [R1 t1];
+    P2 = [R1 t2];
+    P3 = [R2 t1];
+    P4 = [R2 t2];
+    
+    
+    
+    
+    error1 = 0;
+    error2 = 0;
+    error3 = 0;
+    error4 = 0;
+    
+    for i = 1:size(kf1points,2)
+        X1 = linearreproject(K\kf1points(:,i),K\kf2points(:,i),P,P1);
+        X2 = linearreproject(K\kf1points(:,i),K\kf2points(:,i),P,P2);
+        X3 = linearreproject(K\kf1points(:,i),K\kf2points(:,i),P,P3);
+        X4 = linearreproject(K\kf1points(:,i),K\kf2points(:,i),P,P4);
+        
+        if (X1(3)>0)
+            X1 = [R1 t1; 0 0 0 1]*X1;
+            error1 = error1 + (X1(3)<0);
+        else
+            error1 = error1 + 1;
+        end
+        
+        if (X2(3)>0)
+            X2 = [R1 t2; 0 0 0 1]*X2;
+            error2 = error2 + (X2(3)<0);
+        else
+            error2 = error2 + 1;
+        end
+        
+        if (X3(3)>0)
+            X3 = [R2 t1; 0 0 0 1]*X3;
+            error3 = error3 + (X3(3)<0);
+        else
+            error3 = error3 + 1;
+        end
+        
+        if (X4(3)>0)
+            X4 = [R2 t2; 0 0 0 1]*X4;
+            error4 = error4 + (X4(3)<0);
+        else
+            error4 = error4 + 1;
+        end
+        
+        
     end
     
-    if (X2(3)>0)
-        X2 = [R1 t2; 0 0 0 1]*X2;
-        error2 = error2 + (X2(3)<0);
-    else
-        error2 = error2 + 1;
+    display(error1);
+    display(error2);
+    display(error3);
+    display(error4);
+    
+    
+    
+    if error1 == 0
+        R = R1;
+        t = t1;
     end
     
-    if (X3(3)>0)
-        X3 = [R2 t1; 0 0 0 1]*X3;
-        error3 = error3 + (X3(3)<0);
-    else
-        error3 = error3 + 1;
+    if error2 == 0
+        R = R1;
+        t = t2;
     end
     
-    if (X4(3)>0)
-        X4 = [R2 t2; 0 0 0 1]*X4;
-        error4 = error4 + (X4(3)<0);
-    else
-        error4 = error4 + 1;
-    end    
-   
+    if error3 == 0
+        R = R2;
+        t = t1;
+    end
     
-end
-
-display(error1);
-display(error2);
-display(error3);
-display(error4);
-
-if error1 == 0
-    R = R1;
-    t = t1;
-end
-
-if error2 == 0
-    R = R1;
-    t = t2;
-end
-
-if error3 == 0
-    R = R2;
-    t = t1;
-end
-
-if error4 == 0
-    R = R2;
-    t = t2;
+    if error4 == 0
+        R = R2;
+        t = t2;
+    end
+    
 end
 
 scale = abs(2/t(1));
@@ -421,12 +443,16 @@ t = t*scale;
 display(R);
 display(t);
 
+R = single(R);
+t = single(t);
+
+
 Ext = [R t; 0 0 0 1];
 
 
-function outpoints = Reproject(Keyframe1, Keyframe2, P1, P2,K, inpoints)
+function outpoints = Reproject(Keyframe1, Keyframe2, E1, E2,K)
 
-kf1points = []; 
+kf1points = [];
 kf2points = [];
 ids = [];
 X = [];
@@ -434,16 +460,19 @@ X = [];
 for i = 1:length(Keyframe1.ImagePoints)
     for j = 1:length(Keyframe2.ImagePoints)
         if (Keyframe1.ImagePoints(i).id == Keyframe2.ImagePoints(j).id)
-
-            kf1p = K/Keyframe1.ImagePoints(i).location;
-%             kf1p = kf1p / kf1p(3);
-            kf2p = Keyframe2.ImagePoints(j).location;
-%             kf2p = kf2p / kf2p(3);
+            
+            kf1p = K\Keyframe1.ImagePoints(i).location;
+            kf1p = kf1p / kf1p(3);
+%             kf1p(1:2) = kf1p(1:2) + 0.01*rand(2,1);
+            kf2p = K\Keyframe2.ImagePoints(j).location;
+            kf2p = kf2p / kf2p(3);
+%             kf1p(1:2) = kf1p(1:2) + 0.01*rand(2,1);
+            
             
             kf1points = [kf1points kf1p];
             kf2points = [kf2points kf2p];
             ids = [ids Keyframe1.ImagePoints(i).id];
-            X = [X inpoints(Keyframe1.ImagePoints(i).id).location];
+            %             X = [X inpoints(Keyframe1.ImagePoints(i).id).location];
             
         end
         
@@ -453,7 +482,7 @@ end
 outpoints = [];
 XX = [];
 for i = 1:size(kf1points,2)
-    newpoint = linearreproject(kf1points(:,i),kf2points(:,i),P1,P2,X(:,i));
+    newpoint = linearreproject(kf1points(:,i),kf2points(:,i),E1,E2);
     if ~isempty(newpoint)
         XX = [XX newpoint];
         outpoints(i).location = newpoint;
@@ -476,10 +505,11 @@ function pushbutton_path_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-World = getappdata(handles.figure1,'world');
+
 keycount = 0;
 
-for theta = 0.1:0.1:2*pi
+for theta = 0.1:0.1:pi/8.
+    World = getappdata(handles.figure1,'world');
     keycount = keycount + 1;
     UpdateTick(handles);
     ct = [18*cos(theta)-16 0 18*sin(theta)]';
@@ -490,7 +520,7 @@ for theta = 0.1:0.1:2*pi
     setappdata(handles.figure1,'theta',theta);
     
     EstimateCamera(handles);
-    UpdateTick(handles);  
+    UpdateTick(handles);
     if keycount > 0
         AddKeyFrame(handles);
         keycount = 0;
@@ -511,12 +541,17 @@ World.Camera.camt = ct;
 World.Camera.thetay = 0;
 setappdata(handles.figure1,'world',World);
 UpdateTick(handles);
+World = getappdata(handles.figure1,'world');
 
 CurrKeyFrame = getappdata(handles.figure1,'currkeyframe');
+
 PTAM.KeyFrames(1) = CurrKeyFrame;
+CurrKeyFrame.Camera = World.Camera;
+World.KeyFrames(1) = CurrKeyFrame;
 PTAM.kfcount = 1;
 DisplayImage(PTAM.KeyFrames(1).ImagePoints, handles.viewkeyframe1);
 setappdata(handles.figure1,'ptam',PTAM);
+setappdata(handles.figure1,'world',World);
 
 % --- Executes on button press in pushbutton_init2.
 function pushbutton_init2_Callback(hObject, eventdata, handles)
@@ -530,12 +565,17 @@ World.Camera.camt = ct;
 World.Camera.thetay = -0.1;
 setappdata(handles.figure1,'world',World);
 UpdateTick(handles);
+World = getappdata(handles.figure1,'world');
 
 CurrKeyFrame = getappdata(handles.figure1,'currkeyframe');
+
 PTAM.KeyFrames(2) = CurrKeyFrame;
+CurrKeyFrame.Camera = World.Camera;
+World.KeyFrames(2) = CurrKeyFrame;
 PTAM.kfcount = 2;
 DisplayImage(PTAM.KeyFrames(2).ImagePoints, handles.viewkeyframe2);
 setappdata(handles.figure1,'ptam',PTAM);
+setappdata(handles.figure1,'world',World);
 
 % --- Executes on button press in pushbutton_reproject.
 function pushbutton_reproject_Callback(hObject, eventdata, handles)
@@ -545,20 +585,20 @@ function pushbutton_reproject_Callback(hObject, eventdata, handles)
 World = getappdata(handles.figure1,'world');
 PTAM = getappdata(handles.figure1,'ptam');
 
-E1 = 0;
+K = PTAM.Camera.K;
 display(World.Camera.R);
 PTAM.Camera = World.Camera;
-% PTAM.Camera.E = CalculateExt(PTAM.KeyFrames(1), PTAM.KeyFrames(2), World.Camera.K,E1);
-K = PTAM.Camera.K;
-P1 = K*[eye(3,3) [0;0;0]];
-P2 = K*World.Camera.E(1:3,:);
+PTAM.Camera.E = CalculateExt(PTAM.KeyFrames(1), PTAM.KeyFrames(2), World.Camera.K);
+
+E1 = [eye(3,3) [0;0;0]];
+E2 = World.Camera.E(1:3,:);
 
 
 
-PTAM.KeyFrames(2).Camera = PTAM.Camera;
+% PTAM.KeyFrames(2).Camera = PTAM.Camera;
 
 
-PTAM.Map.points = Reproject(PTAM.KeyFrames(1), PTAM.KeyFrames(2),P1,P2,K, World.Map.points);
+PTAM.Map.points = Reproject(PTAM.KeyFrames(1), PTAM.KeyFrames(2),E1,E2,K);
 
 setappdata(handles.figure1,'ptam',PTAM);
 UpdateTick(handles);
@@ -570,7 +610,7 @@ PTAM = getappdata(handles.figure1,'ptam');
 World.Camera = RfromEuler(World.Camera);
 
 
-%Display the camera external matrices and the error 
+%Display the camera external matrices and the error
 E1 = World.Camera.E;
 E1 = round(E1*1000)/1000;
 set(handles.text_camext,'String',['World Camera E: ' mat2str(E1)]);
@@ -579,8 +619,22 @@ E2 = PTAM.Camera.E;
 E2 = round(E2*1000)/1000;
 set(handles.text_estcamext,'String',['PTAM Camera E: ' mat2str(E2)]);
 
-Cam_Error = norm(E2 - E1);
-set(handles.text_cameraerror,'String',['Camera Error: ' num2str(Cam_Error)]);
+camerror = norm(E2 - E1);
+set(handles.text_cameraerror,'String',['Camera Error: ' num2str(camerror)]);
+
+
+if PTAM.kfcount > 1
+    totalcamerror = 0;
+    for i = 1:PTAM.kfcount
+        E1 = World.KeyFrames(i).Camera.E;
+        E2 = PTAM.KeyFrames(i).Camera.E;
+        totalcamerror = totalcamerror + norm(E1-E2);
+    end
+    set(handles.text_totalcamerror,'String',['Total Camera Error: ' num2str(totalcamerror)]);
+    set(handles.text_numkeyframes,'String',['Number of KeyFrames: ' num2str(PTAM.kfcount )]);
+    set(handles.text_averagecamerror,'String',['Average Camera Error: ' num2str(totalcamerror/PTAM.kfcount )]);
+end
+
 
 
 [error count] = calculateworlderror(World.Map,PTAM.Map);
@@ -641,8 +695,9 @@ error = 10;
 [X x] = FindMatches(PTAM.Map, CurrKeyFrame,npoints);
 if (size(X,2) > 10)
     display('Estimating pose...');
-    [muout error] = estimatepose(Ein,K,X,x,600);
+    [muout error] = estimatepose(Ein,K,X,x,100);
     PTAM.Camera.E = expmap(muout)*Ein;
+%     PTAM.Camera.E = World.Camera.E;
     PTAM.Camera.mu = muout;
     PTAM.Camera.P = K*PTAM.Camera.E(1:3,:);
     display('Done estimating!');
@@ -655,6 +710,10 @@ setappdata(handles.figure1,'ptam',PTAM);
 function [X x] = FindMatches(Map, KeyFrame,npoints)
 X = [];
 x = [];
+
+if npoints > size(KeyFrame.ImagePoints,2)
+    npoints = size(KeyFrame.ImagePoints,2);
+end
 
 for i = 1:size(KeyFrame.ImagePoints,2)
     input(1:3,i) = KeyFrame.ImagePoints(i).location;
@@ -683,23 +742,29 @@ AddKeyFrame(handles);
 function AddKeyFrame(handles)
 UpdateTick(handles);
 PTAM = getappdata(handles.figure1,'ptam');
+World = getappdata(handles.figure1,'world');
 CurrKeyFrame = getappdata(handles.figure1,'currkeyframe');
+
 
 PTAM.kfcount = PTAM.kfcount + 1;
 PTAM.KeyFrames(PTAM.kfcount) = CurrKeyFrame;
 DisplayKeyFrames(PTAM.KeyFrames, handles.viewtopdownest);
 
+CurrKeyFrame.Camera = World.Camera;
+World.KeyFrames(PTAM.kfcount) = CurrKeyFrame;
+
 
 % Add some world points from this keyframe
-KeyFrame1 = CurrKeyFrame;
+KeyFrame1 = PTAM.KeyFrames(PTAM.kfcount);
 KeyFrame2 =  FindClosestKeyFrame(PTAM.kfcount, PTAM.KeyFrames);
 DisplayImage(KeyFrame1.ImagePoints, handles.viewkeyframe1);
 DisplayImage(KeyFrame2.ImagePoints, handles.viewkeyframe2);
 
-P1 = KeyFrame1.Camera.K*KeyFrame1.Camera.E(1:3,:);
-P2 = KeyFrame2.Camera.K*KeyFrame2.Camera.E(1:3,:);
+E1 = KeyFrame1.Camera.E(1:3,:);
+E2 = KeyFrame2.Camera.E(1:3,:);
+K = KeyFrame1.Camera.K;
 
-outpoints = Reproject(KeyFrame1, KeyFrame2, P1, P2);
+outpoints = Reproject(KeyFrame1, KeyFrame2, E1, E2, K);
 origsize = size(outpoints,2);
 origmapsize = size(PTAM.Map.points,2);
 PTAM.Map = AppendMap(PTAM.Map,outpoints);
@@ -708,6 +773,7 @@ pointsadded = newmapsize-origmapsize;
 
 display([int2str(pointsadded) ' points added out of ' int2str(origsize)]);
 setappdata(handles.figure1,'ptam',PTAM);
+setappdata(handles.figure1,'world',World);
 UpdateTick(handles);
 
 
@@ -743,9 +809,9 @@ minkfcount = 0;
 
 
 for i = 1:size(KeyFrames,2)
-    if i ~= kfcount 
+    if i ~= kfcount
         dist = norm(KeyFrames(i).Camera.E(1:3,4) - KeyFrames(kfcount).Camera.E(1:3,4));
-        if dist < mindist 
+        if dist < mindist
             mindist = dist;
             minkfcount = i;
         end
@@ -767,8 +833,31 @@ for i = 1:size(points,2)
         end
     end
     if haspoint == false
-            outMap.points(size(outMap.points,2)+1) = points(i);
+        outMap.points(size(outMap.points,2)+1) = points(i);
     end
     
-            
+    
 end
+
+
+% --- Executes on button press in pushbutton_bundle.
+function pushbutton_bundle_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton_bundle (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+PTAM = getappdata(handles.figure1,'ptam');
+E1 = [];
+for i = 1:PTAM.kfcount
+    E1 = [E1; PTAM.KeyFrames(i).Camera.E];
+end
+
+
+PTAM = bundleadjust(PTAM);
+setappdata(handles.figure1,'ptam',PTAM);
+UpdateTick(handles);
+
+E2 = [];
+for i = 1:PTAM.kfcount
+    E2 = [E2; PTAM.KeyFrames(i).Camera.E];
+end
+
