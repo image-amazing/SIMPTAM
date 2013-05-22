@@ -22,7 +22,7 @@ function varargout = proj(varargin)
 
 % Edit the above text to modify the response to help proj
 
-% Last Modified by GUIDE v2.5 24-Apr-2013 13:45:40
+% Last Modified by GUIDE v2.5 22-May-2013 15:19:09
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -863,4 +863,40 @@ E2 = [];
 for i = 1:PTAM.kfcount
     E2 = [E2; PTAM.KeyFrames(i).Camera.E];
 end
+
+
+% --- Executes on button press in pushbutton_view3d.
+function pushbutton_view3d_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton_view3d (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+World = getappdata(handles.figure1,'world');
+PTAM = getappdata(handles.figure1,'ptam');
+
+ptamPoints = [];
+worldPoints = [];
+
+
+for i = 1:size(PTAM.Map.points,2)
+    ptamPoints(1,i) = PTAM.Map.points(i).location(1);
+    ptamPoints(2,i) = PTAM.Map.points(i).location(2);
+    ptamPoints(3,i) = PTAM.Map.points(i).location(3);
+end
+
+for i = 1:size(World.Map.points,2)
+    worldPoints(1,i) = World.Map.points(i).location(1);
+    worldPoints(2,i) = World.Map.points(i).location(2);
+    worldPoints(3,i) = World.Map.points(i).location(3);
+end
+
+
+figure
+
+plot3(worldPoints(1,:),worldPoints(2,:),worldPoints(3,:),'bo');
+hold on
+plot3(ptamPoints(1,:),ptamPoints(2,:),ptamPoints(3,:),'ro');
+
+
+
+
 

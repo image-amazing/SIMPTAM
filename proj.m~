@@ -22,7 +22,7 @@ function varargout = proj(varargin)
 
 % Edit the above text to modify the response to help proj
 
-% Last Modified by GUIDE v2.5 24-Apr-2013 13:45:40
+% Last Modified by GUIDE v2.5 22-May-2013 15:19:09
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -339,8 +339,11 @@ while isempty(R)
     t1 = t;
     t2 = -t;
     
+    ferror = 0;
     for i = 1:size(kf1points,2)
-        kf
+        ferror = ferror + abs(kf2points(:,i)'*F*kf1points(:,i));
+    end
+    display(ferror);
     
     
     
@@ -463,10 +466,10 @@ for i = 1:length(Keyframe1.ImagePoints)
             
             kf1p = K\Keyframe1.ImagePoints(i).location;
             kf1p = kf1p / kf1p(3);
-%             kf1p(1:2) = kf1p(1:2) + 0.01*rand(2,1);
+            kf1p(1:2) = kf1p(1:2) + 0.0005*rand(2,1);
             kf2p = K\Keyframe2.ImagePoints(j).location;
             kf2p = kf2p / kf2p(3);
-%             kf1p(1:2) = kf1p(1:2) + 0.01*rand(2,1);
+            kf1p(1:2) = kf1p(1:2) + 0.0005*rand(2,1);
             
             
             kf1points = [kf1points kf1p];
@@ -508,7 +511,7 @@ function pushbutton_path_Callback(hObject, eventdata, handles)
 
 keycount = 0;
 
-for theta = 0.1:0.1:pi/8.
+for theta = 0.1:0.1:pi/2
     World = getappdata(handles.figure1,'world');
     keycount = keycount + 1;
     UpdateTick(handles);
@@ -595,7 +598,7 @@ E2 = World.Camera.E(1:3,:);
 
 
 
-% PTAM.KeyFrames(2).Camera = PTAM.Camera;
+PTAM.KeyFrames(2).Camera = PTAM.Camera;   
 
 
 PTAM.Map.points = Reproject(PTAM.KeyFrames(1), PTAM.KeyFrames(2),E1,E2,K);
@@ -695,7 +698,7 @@ error = 10;
 [X x] = FindMatches(PTAM.Map, CurrKeyFrame,npoints);
 if (size(X,2) > 10)
     display('Estimating pose...');
-    [muout error] = estimatepose(Ein,K,X,x,100);
+    [muout error] = estimatepose(Ein,K,X,x,300);
     PTAM.Camera.E = expmap(muout)*Ein;
 %     PTAM.Camera.E = World.Camera.E;
     PTAM.Camera.mu = muout;
@@ -860,4 +863,12 @@ E2 = [];
 for i = 1:PTAM.kfcount
     E2 = [E2; PTAM.KeyFrames(i).Camera.E];
 end
+
+
+% --- Executes on button press in pushbutton_view3d.
+function pushbutton_view3d_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton_view3d (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
 
