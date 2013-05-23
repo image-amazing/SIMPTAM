@@ -1,0 +1,23 @@
+function [ points ] = generateworldpoints3(r,h)
+%GENERATEWORLDPOINTS Generates some world points
+
+pointCount = 0;
+ymin = -5; 
+ymax = 5;
+xmin = -36;
+xmax = 4;
+zmin = 0;
+zmax = h;
+
+for i = 1:100
+    x = rand
+    
+
+
+
+
+
+
+
+end
+
